@@ -237,3 +237,11 @@ CREATE TABLE IF NOT EXISTS media_files (
   created_at DATETIME       NOT NULL DEFAULT CURRENT_TIMESTAMP,
   PRIMARY KEY (mkey)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- Internal values for environment-configured hosts: schema version and, when the
+-- APP_SECRET variable is not set, the generated application secret. Never shown in the admin.
+CREATE TABLE IF NOT EXISTS app_meta (
+  mkey   VARCHAR(40)  NOT NULL,
+  mvalue VARCHAR(255) NOT NULL,
+  PRIMARY KEY (mkey)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;

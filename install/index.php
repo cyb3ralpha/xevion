@@ -15,6 +15,12 @@ header('X-Robots-Tag: noindex, nofollow');
 header('Referrer-Policy: no-referrer');
 header('Cache-Control: no-store');
 
+// On Vercel nothing can be written to disk: without database variables the home page explains what to set.
+if (env_platform() && !env_config_available()) {
+    header('Location: ' . rtrim(dirname(dirname($_SERVER['SCRIPT_NAME'] ?? '/install/index.php')), '/\\') . '/', true, 302);
+    exit;
+}
+
 if (installer_is_locked()) {
     http_response_code(404);
     echo '<!doctype html><meta charset="utf-8"><title>Not found</title><p>Not found.</p>';

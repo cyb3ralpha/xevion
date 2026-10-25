@@ -23,23 +23,43 @@ function env_bool(string $key, bool $default): bool
     return in_array(strtolower((string)$v), ['1', 'true', 'yes', 'on'], true);
 }
 
+/** First non-empty variable among $keys (accepts the names used by common MySQL providers). */
+function env_first(array $keys, string $default = ''): string
+{
+    foreach ($keys as $k) {
+        if (($v = env_str($k)) !== '') {
+            return $v;
+        }
+    }
+    return $default;
+}
+
+const ENV_DB_URL  = ['DATABASE_URL', 'MYSQL_URL', 'MYSQL_PUBLIC_URL', 'TIDB_DATABASE_URL'];
+const ENV_DB_HOST = ['DB_HOST', 'MYSQL_HOST', 'MYSQLHOST', 'TIDB_HOST'];
+
 function env_config_available(): bool
 {
-    return env_str('DATABASE_URL') !== '' || env_str('DB_HOST') !== '';
+    return env_first(ENV_DB_URL) !== '' || env_first(ENV_DB_HOST) !== '';
+}
+
+/** True on Vercel (or when forced), even before any database variable is set. */
+function env_platform(): bool
+{
+    return env_str('VERCEL') !== '' || env_bool('APP_CONFIG_FROM_ENV', false);
 }
 
 function env_config(): array
 {
     $onVercel = env_str('VERCEL') !== '';
     $db = [
-        'host' => env_str('DB_HOST', 'localhost'),
-        'port' => (int)env_str('DB_PORT', '3306'),
-        'name' => env_str('DB_NAME', env_str('DB_DATABASE')),
-        'user' => env_str('DB_USER', env_str('DB_USERNAME')),
-        'pass' => env_str('DB_PASSWORD', env_str('DB_PASS')),
+        'host' => env_first(ENV_DB_HOST, 'localhost'),
+        'port' => (int)env_first(['DB_PORT', 'MYSQL_PORT', 'MYSQLPORT', 'TIDB_PORT'], '3306'),
+        'name' => env_first(['DB_NAME', 'DB_DATABASE', 'MYSQL_DATABASE', 'MYSQLDATABASE', 'TIDB_DATABASE']),
+        'user' => env_first(['DB_USER', 'DB_USERNAME', 'MYSQL_USER', 'MYSQLUSER', 'TIDB_USER']),
+        'pass' => env_first(['DB_PASSWORD', 'DB_PASS', 'MYSQL_PASSWORD', 'MYSQLPASSWORD', 'TIDB_PASSWORD']),
     ];
-    // DATABASE_URL=mysql://user:pass@host:port/dbname overrides the separate variables.
-    if (($u = env_str('DATABASE_URL')) !== '' && ($p = parse_url($u)) && isset($p['host'])) {
+    // A connection URL (mysql://user:pass@host:port/dbname) overrides the separate variables.
+    if (($u = env_first(ENV_DB_URL)) !== '' && ($p = parse_url($u)) && isset($p['host'])) {
         $db['host'] = $p['host'];
         $db['port'] = (int)($p['port'] ?? 3306);
         $db['name'] = ltrim(rawurldecode($p['path'] ?? ''), '/');

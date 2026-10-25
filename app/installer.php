@@ -44,7 +44,7 @@ function installer_requirements(): array
     ];
     if (installer_env_mode()) {
         $env = env_config();
-        $checks['APP_SECRET variable (64 random hex characters)'] = strlen($env['app_secret']) >= 32;
+        $checks['APP_SECRET variable (optional, generated automatically)'] = strlen($env['app_secret']) >= 32 ? true : null;
         $checks['SETUP_KEY variable (16+ characters)'] = strlen($env['setup_key']) >= 16;
         $checks['BASE_URL variable (optional on Vercel)'] = $env['base_url'] !== '' ? true : null;
     } else {

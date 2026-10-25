@@ -25,29 +25,31 @@ In Vercel choose **Add New → Project**, import the GitHub repository and keep 
 
 ## 3. Set environment variables
 
-In **Project → Settings → Environment Variables** add:
+In **Project → Settings → Environment Variables** add the database connection and an admin login. That is all that is required:
 
 | Variable | Required | Value |
 |---|---|---|
-| `DB_HOST` | yes | Database host |
-| `DB_PORT` | no | Default `3306` |
-| `DB_NAME` | yes | Database name |
-| `DB_USER` | yes | Database user |
-| `DB_PASSWORD` | yes | Database password |
-| `DATABASE_URL` | alternative | `mysql://user:pass@host:port/dbname` instead of the five above |
-| `DB_SSL` | no | Default `true` on Vercel; set `false` only if your database has no TLS |
-| `DB_SSL_CA` | no | Path to a CA bundle; the system bundle is used by default |
-| `APP_SECRET` | yes | 64 random hex characters, e.g. `php -r "echo bin2hex(random_bytes(32));"`. Never change it after launch: it signs links and encrypts stored codes |
-| `SETUP_KEY` | yes | Any random string of 16+ characters; the installer asks for it once |
-| `CRON_SECRET` | recommended | Random string of 16+ characters; Vercel Cron sends it to `/api/cron` |
-| `BASE_URL` | recommended | Your public address, e.g. `https://facematch.example.com`. Defaults to the Vercel production domain |
+| `DATABASE_URL` | yes, or the five below | `mysql://user:password@host:3306/dbname` (`MYSQL_URL` is also accepted) |
+| `DB_HOST`, `DB_PORT`, `DB_NAME`, `DB_USER`, `DB_PASSWORD` | alternative | Separate values instead of a URL (`MYSQL_HOST`, `MYSQLHOST` and similar provider names also work) |
+| `ADMIN_EMAIL` | yes | Email for the first super administrator |
+| `ADMIN_PASSWORD` | yes | 12+ characters. Used only to create the account; change it later in the dashboard |
+| `ADMIN_NAME` | no | Display name, default `Administrator` |
+| `APP_SECRET` | no | 64 random hex characters. If unset, one is generated and kept in the database. If you set it, set it before the first visit and never change it |
+| `CRON_SECRET` | recommended | Random string of 16+ characters; enables the daily maintenance call from Vercel Cron |
+| `BASE_URL` | no | Public address for share links, e.g. `https://facematch.example.com`. Defaults to the Vercel production domain |
+| `DB_SSL` | no | Default `true`; set `false` only if your database has no TLS |
 
-Mark `DB_PASSWORD`, `APP_SECRET`, `SETUP_KEY` and `CRON_SECRET` as sensitive. Redeploy after adding or changing variables.
+Mark passwords and secrets as sensitive, then **redeploy** (Deployments → ⋯ → Redeploy) so the new variables take effect.
 
-## 4. Run the installer once
+## 4. Open the site
 
-Open `https://<your-domain>/install`, enter the `SETUP_KEY` value and create the super administrator. The installer creates the tables and then disables itself, returning 404 once a super administrator exists. Sign in at `/admin/`.
+There is no installation step. The first visit creates the tables, the application secret and the administrator account. Sign in at `/admin/` with `ADMIN_EMAIL` and `ADMIN_PASSWORD`.
 
+If the variables are missing, the site shows **Database not connected** with the list above. If they are wrong, it shows **Cannot reach the database**, and the Vercel function logs give the MySQL error code.
+
+Without `ADMIN_EMAIL`/`ADMIN_PASSWORD` you can still create the administrator at `/install`, using a `SETUP_KEY` variable as the one-time key.
+
+Later deploys that add tables apply them automatically.
 ## Limits to know
 
 - **Request size:** Vercel rejects requests over 4.5 MB. The create form resizes every photo in the browser and shrinks them further until the whole match fits. With JavaScript disabled, uploads larger than that fail.

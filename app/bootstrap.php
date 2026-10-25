@@ -10,7 +10,7 @@ define('APP_VERSION', '1.0.0');
 
 date_default_timezone_set('UTC'); // all stored timestamps are UTC
 
-require APP_ROOT . '/app/env_config.php';
+require_once APP_ROOT . '/app/env_config.php';
 
 $configFile = APP_ROOT . '/config/config.php';
 $useEnv = env_config_available() && (!is_file($configFile) || env_bool('APP_CONFIG_FROM_ENV', false));
@@ -21,6 +21,20 @@ if (!$useEnv && !is_file($configFile)) {
     }
     http_response_code(503);
     header('Content-Type: text/html; charset=utf-8');
+    header('Cache-Control: no-store');
+    if (env_platform()) {
+        // Vercel: nothing to install by hand, but the database connection must be configured.
+        echo '<!doctype html><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>Database not connected</title>'
+           . '<body style="font-family:system-ui;background:#0C0727;color:#fff;display:grid;place-items:center;min-height:100vh;margin:0;padding:16px">'
+           . '<div style="max-width:520px"><h1>Database not connected</h1>'
+           . '<p>XEVION FaceMatch sets itself up automatically, but it needs a MySQL database. In Vercel, open '
+           . '<b>Project → Settings → Environment Variables</b>, add the variables below, then redeploy.</p>'
+           . '<ul style="line-height:1.8"><li><code>DATABASE_URL</code> = <code>mysql://user:password@host:3306/dbname</code><br>'
+           . 'or <code>DB_HOST</code>, <code>DB_PORT</code>, <code>DB_NAME</code>, <code>DB_USER</code>, <code>DB_PASSWORD</code></li>'
+           . '<li><code>ADMIN_EMAIL</code> and <code>ADMIN_PASSWORD</code> (12+ characters) for the admin account</li></ul>'
+           . '<p style="opacity:.75">Tables are created on the first visit after that.</p></div>';
+        exit;
+    }
     $base = rtrim(str_replace('\\', '/', dirname($_SERVER['SCRIPT_NAME'] ?? '/')), '/');
     if (str_ends_with($base, '/admin')) { $base = substr($base, 0, -6); }
     echo '<!doctype html><meta charset="utf-8"><title>Setup required</title>'
@@ -44,6 +58,7 @@ require APP_ROOT . '/app/competitions.php';
 require APP_ROOT . '/app/voting.php';
 require APP_ROOT . '/app/ads.php';
 require APP_ROOT . '/app/audit.php';
+require APP_ROOT . '/app/auto_setup.php';
 
 $isDebug = (config('env') === 'development');
 ini_set('display_errors', $isDebug ? '1' : '0');
@@ -72,14 +87,16 @@ set_exception_handler(static function (Throwable $e): void {
     if (!headers_sent()) {
         http_response_code(500);
     }
-    // Environment-configured deployments (Vercel) start with an empty database.
-    if (config('from_env') && $e instanceof PDOException && ($e->errorInfo[0] ?? '') === '42S02' && !is_api_request()) {
+    // Environment-configured deployments (Vercel): say clearly when the database is unreachable.
+    if (config('from_env') && $e instanceof RuntimeException && $e->getMessage() === 'Database unavailable' && !is_api_request()) {
         http_response_code(503);
-        echo '<!doctype html><meta charset="utf-8"><title>Setup required</title>'
-           . '<body style="font-family:system-ui;background:#0C0727;color:#fff;display:grid;place-items:center;min-height:100vh;margin:0">'
-           . '<div style="max-width:420px;text-align:center"><h1>Setup required</h1>'
-           . '<p>The database has no tables yet.</p>'
-           . '<p><a style="color:#188CF1" href="' . e(url('/install')) . '">Open the installer</a></p></div>';
+        header('Cache-Control: no-store');
+        echo '<!doctype html><meta charset="utf-8"><title>Database unavailable</title>'
+           . '<body style="font-family:system-ui;background:#0C0727;color:#fff;display:grid;place-items:center;min-height:100vh;margin:0;padding:16px">'
+           . '<div style="max-width:480px"><h1>Cannot reach the database</h1>'
+           . '<p>Check the database environment variables in Vercel (host, port, name, user, password) and that the database '
+           . 'accepts connections from the internet. Set <code>DB_SSL=false</code> only if your database has no TLS. '
+           . 'Details are in the Vercel function logs.</p></div>';
         return;
     }
     if (config('env') === 'development') {
@@ -91,3 +108,8 @@ set_exception_handler(static function (Throwable $e): void {
     }
     render_error(500);
 });
+
+// Vercel and other environment-configured hosts set themselves up on first use.
+if (config('from_env')) {
+    auto_setup_boot();
+}
