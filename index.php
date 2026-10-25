@@ -34,6 +34,7 @@ $routes = [
     '#^/manage/([A-Za-z0-9_-]{30,64})$#'      => 'page_manage',
     '#^/api/next$#'                           => 'api_next',
     '#^/api/vote$#'                           => 'api_vote',
+    '#^/api/cron$#'                           => 'api_cron',
     '#^/media/([A-Za-z0-9]{16})/(thumb|full)$#' => 'media_participant',
     '#^/media/ad/([A-Za-z0-9]{12})/(d|m)$#'   => 'media_ad',
     '#^/go/([A-Za-z0-9]{12})$#'               => 'page_ad_click',

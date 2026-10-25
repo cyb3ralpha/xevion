@@ -601,7 +601,7 @@ function media_participant(string $publicId, string $size): void
     if (!$c || !comp_viewable($c)) {
         not_found();
     }
-    $file = media_abs_path($size === 'full' ? $p['image_file'] : $p['thumb_file']);
+    $file = media_locate($size === 'full' ? $p['image_file'] : $p['thumb_file']);
     if (!$file) {
         not_found();
     }
@@ -614,7 +614,7 @@ function media_ad(string $publicId, string $variant): void
     if (!$ad || !ad_is_live($ad)) {
         not_found();
     }
-    $file = media_abs_path($variant === 'm' ? $ad['mobile_image_file'] : $ad['image_file']);
+    $file = media_locate($variant === 'm' ? $ad['mobile_image_file'] : $ad['image_file']);
     if (!$file) {
         not_found();
     }
@@ -769,4 +769,20 @@ function page_privacy(): void
 function page_terms(): void
 {
     render('terms', ['title' => 'Terms of Service', 'contactEmail' => (string)setting('contact_email', '')]);
+}
+
+/* ============================================================ Scheduled maintenance */
+
+/**
+ * Called by Vercel Cron (see vercel.json) with "Authorization: Bearer <CRON_SECRET>".
+ * On ordinary hosting use cli/maintenance.php from cron instead.
+ */
+function api_cron(): void
+{
+    $secret = (string)config('cron_secret', '');
+    $sent = (string)($_SERVER['HTTP_AUTHORIZATION'] ?? '');
+    if (strlen($secret) < 16 || !hash_equals('Bearer ' . $secret, $sent)) {
+        not_found();
+    }
+    json_out(['ok' => true, 'result' => run_housekeeping()]);
 }

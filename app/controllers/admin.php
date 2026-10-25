@@ -439,13 +439,13 @@ function admin_media(): void
             render_error(403);
         }
         $p = q_one('SELECT * FROM participants WHERE public_id = ?', [$pub]);
-        $file = $p ? media_abs_path(str_input('s', 5) === 'full' ? $p['image_file'] : $p['thumb_file']) : null;
+        $file = $p ? media_locate(str_input('s', 5) === 'full' ? $p['image_file'] : $p['thumb_file']) : null;
     } elseif ($ad = str_input('ad', 12)) {
         if (!admin_can('ads')) {
             render_error(403);
         }
         $row = q_one('SELECT * FROM ad_campaigns WHERE public_id = ?', [$ad]);
-        $file = $row ? media_abs_path(str_input('v', 1) === 'm' ? $row['mobile_image_file'] : $row['image_file']) : null;
+        $file = $row ? media_locate(str_input('v', 1) === 'm' ? $row['mobile_image_file'] : $row['image_file']) : null;
     } else {
         $file = null;
     }

@@ -22,7 +22,7 @@
   </form>
 </section>
 <?php endif; ?>
-<form method="post" enctype="multipart/form-data" class="card pad form-stack" style="max-width:860px">
+<form method="post" enctype="multipart/form-data" class="card pad form-stack" style="max-width:860px" data-shrink-images>
   <?= csrf_field() ?>
   <div class="grid-2">
     <label class="field"><span>Campaign name</span><input name="name" maxlength="120" required value="<?= e($o['name']) ?>"><?= $err('name') ?></label>
@@ -33,8 +33,8 @@
     <label class="field"><span>Placement</span><select name="placement"><option value="top_banner"<?= $o['placement'] === 'top_banner' ? ' selected' : '' ?>>Top banner (all pages)</option><option value="footer_banner"<?= $o['placement'] === 'footer_banner' ? ' selected' : '' ?>>Footer banner (all pages)</option></select></label>
   </div>
   <div class="grid-2">
-    <label class="field"><span>Desktop banner <span class="hint">JPG/PNG/WebP, ≤2 MB, ≥728 px wide, ratio 3:1–12:1 (e.g. 1456×180)</span></span><input type="file" name="image" accept="image/jpeg,image/png,image/webp"><?= $err('image') ?></label>
-    <label class="field"><span>Mobile banner (optional) <span class="hint">≥320 px wide, ratio 2:1–6:1 (e.g. 640×200)</span></span><input type="file" name="mobile_image" accept="image/jpeg,image/png,image/webp"><?= $err('mobile_image') ?>
+    <label class="field"><span>Desktop banner <span class="hint">JPG/PNG/WebP, ≤2 MB, ≥728 px wide, ratio 3:1–12:1 (e.g. 1456×180)</span></span><input type="file" name="image" accept="image/jpeg,image/png,image/webp" data-shrink="1800x600"><?= $err('image') ?></label>
+    <label class="field"><span>Mobile banner (optional) <span class="hint">≥320 px wide, ratio 2:1–6:1 (e.g. 640×200)</span></span><input type="file" name="mobile_image" accept="image/jpeg,image/png,image/webp" data-shrink="960x600"><?= $err('mobile_image') ?>
       <?php if (!empty($ad['mobile_image_file'])): ?><label class="check"><input type="checkbox" name="remove_mobile" value="1"><span>Remove current mobile banner</span></label><?php endif; ?></label>
   </div>
   <label class="field"><span>Headline <span class="hint">Required for text ads; used as image alt text</span></span><input name="headline" maxlength="90" value="<?= e($o['headline']) ?>"><?= $err('headline') ?></label>

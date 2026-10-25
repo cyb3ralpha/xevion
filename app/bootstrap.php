@@ -10,8 +10,11 @@ define('APP_VERSION', '1.0.0');
 
 date_default_timezone_set('UTC'); // all stored timestamps are UTC
 
+require APP_ROOT . '/app/env_config.php';
+
 $configFile = APP_ROOT . '/config/config.php';
-if (!is_file($configFile)) {
+$useEnv = env_config_available() && (!is_file($configFile) || env_bool('APP_CONFIG_FROM_ENV', false));
+if (!$useEnv && !is_file($configFile)) {
     if (PHP_SAPI === 'cli') {
         fwrite(STDERR, "XEVION FaceMatch is not installed. Run: php cli/install.php\n");
         exit(1);
@@ -28,10 +31,11 @@ if (!is_file($configFile)) {
     exit;
 }
 
-$GLOBALS['APP_CONFIG'] = require $configFile;
+$GLOBALS['APP_CONFIG'] = $useEnv ? env_config() : require $configFile;
+unset($useEnv, $configFile);
 
 require APP_ROOT . '/app/helpers.php';
-require APP_ROOT . '/app/db.php';
+require_once APP_ROOT . '/app/db.php';
 require APP_ROOT . '/app/security.php';
 require APP_ROOT . '/app/settings.php';
 require APP_ROOT . '/app/content_filter.php';
@@ -44,7 +48,9 @@ require APP_ROOT . '/app/audit.php';
 $isDebug = (config('env') === 'development');
 ini_set('display_errors', $isDebug ? '1' : '0');
 ini_set('log_errors', '1');
-ini_set('error_log', storage_path('logs/php-errors.log'));
+if (config('log', 'file') !== 'stderr') {
+    ini_set('error_log', storage_path('logs/php-errors.log'));
+}
 error_reporting(E_ALL);
 
 set_error_handler(static function (int $severity, string $message, string $file, int $line): bool {
@@ -65,6 +71,16 @@ set_exception_handler(static function (Throwable $e): void {
     }
     if (!headers_sent()) {
         http_response_code(500);
+    }
+    // Environment-configured deployments (Vercel) start with an empty database.
+    if (config('from_env') && $e instanceof PDOException && ($e->errorInfo[0] ?? '') === '42S02' && !is_api_request()) {
+        http_response_code(503);
+        echo '<!doctype html><meta charset="utf-8"><title>Setup required</title>'
+           . '<body style="font-family:system-ui;background:#0C0727;color:#fff;display:grid;place-items:center;min-height:100vh;margin:0">'
+           . '<div style="max-width:420px;text-align:center"><h1>Setup required</h1>'
+           . '<p>The database has no tables yet.</p>'
+           . '<p><a style="color:#188CF1" href="' . e(url('/install')) . '">Open the installer</a></p></div>';
+        return;
     }
     if (config('env') === 'development') {
         echo '<pre style="white-space:pre-wrap">' . e((string)$e) . '</pre>';

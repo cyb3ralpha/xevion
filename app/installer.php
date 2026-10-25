@@ -8,9 +8,28 @@ declare(strict_types=1);
 if (!defined('APP_ROOT')) {
     define('APP_ROOT', dirname(__DIR__));
 }
+require_once APP_ROOT . '/app/env_config.php';
+
+/**
+ * Environment mode (Vercel and other serverless hosts): settings come from environment
+ * variables, nothing is written to disk, and the installer only creates the tables and
+ * the first super administrator.
+ */
+function installer_env_mode(): bool
+{
+    return env_config_available() && (!is_file(APP_ROOT . '/config/config.php') || env_bool('APP_CONFIG_FROM_ENV', false));
+}
 
 function installer_is_locked(): bool
 {
+    if (installer_env_mode()) {
+        try {
+            $pdo = installer_connect(env_config()['db']);
+            return (int)$pdo->query("SELECT COUNT(*) FROM admins WHERE role = 'super_admin'")->fetchColumn() > 0;
+        } catch (Throwable) {
+            return false; // no tables yet (or DB unreachable — the form reports that)
+        }
+    }
     return is_file(APP_ROOT . '/config/config.php') && is_file(APP_ROOT . '/storage/installed.lock');
 }
 
@@ -19,19 +38,29 @@ function installer_requirements(): array
     $checks = [
         'PHP 8.1 or newer'             => version_compare(PHP_VERSION, '8.1.0', '>='),
         'PDO MySQL extension'          => extension_loaded('pdo_mysql'),
-        'GD extension (image processing)' => extension_loaded('gd'),
         'Fileinfo extension'           => extension_loaded('fileinfo'),
         'Sodium extension'             => extension_loaded('sodium'),
         'Mbstring extension'           => extension_loaded('mbstring'),
-        'config/ folder is writable'   => is_writable(APP_ROOT . '/config'),
-        'storage/ folder is writable'  => is_writable(APP_ROOT . '/storage'),
     ];
-    $checks['WebP output (optional, falls back to JPEG)'] = function_exists('imagewebp') ? true : null;
+    if (installer_env_mode()) {
+        $env = env_config();
+        $checks['APP_SECRET variable (64 random hex characters)'] = strlen($env['app_secret']) >= 32;
+        $checks['SETUP_KEY variable (16+ characters)'] = strlen($env['setup_key']) >= 16;
+        $checks['BASE_URL variable (optional on Vercel)'] = $env['base_url'] !== '' ? true : null;
+    } else {
+        $checks['config/ folder is writable'] = is_writable(APP_ROOT . '/config');
+        $checks['storage/ folder is writable'] = is_writable(APP_ROOT . '/storage');
+    }
+    // Optional: without GD, photos are resized in the browser and metadata is stripped in PHP.
+    $checks['GD extension (optional, server-side image re-encoding)'] = extension_loaded('gd') ? true : null;
     return $checks;
 }
 
 function installer_setup_key(): string
 {
+    if (installer_env_mode()) {
+        return env_config()['setup_key'];
+    }
     $file = APP_ROOT . '/storage/setup-key.txt';
     if (!is_file($file)) {
         file_put_contents($file, rtrim(strtr(base64_encode(random_bytes(18)), '+/', '-_'), '=') . "\n", LOCK_EX);
@@ -42,12 +71,9 @@ function installer_setup_key(): string
 
 function installer_connect(array $db): PDO
 {
+    require_once APP_ROOT . '/app/db.php';
     $dsn = sprintf('mysql:host=%s;port=%d;dbname=%s;charset=utf8mb4', $db['host'], (int)$db['port'], $db['name']);
-    $pdo = new PDO($dsn, $db['user'], $db['pass'], [
-        PDO::ATTR_ERRMODE => PDO::ERRMODE_EXCEPTION,
-        PDO::ATTR_DEFAULT_FETCH_MODE => PDO::FETCH_ASSOC,
-        PDO::ATTR_EMULATE_PREPARES => false,
-    ]);
+    $pdo = new PDO($dsn, $db['user'], $db['pass'], db_options($db));
     $pdo->exec("SET time_zone = '+00:00'");
     return $pdo;
 }
@@ -86,8 +112,21 @@ function installer_run(array $in): array
     if ($errors) {
         return $errors;
     }
+    if (installer_env_mode()) {
+        return installer_setup_database(env_config()['db'], $in);
+    }
+    $errors = installer_setup_database($in['db'], $in);
+    if ($errors) {
+        return $errors;
+    }
+    return installer_write_config($base, $in['db']);
+}
+
+/** Create tables and the first super administrator. @return list<string> errors */
+function installer_setup_database(array $db, array $in): array
+{
     try {
-        $pdo = installer_connect($in['db']);
+        $pdo = installer_connect($db);
     } catch (PDOException $e) {
         return ['Could not connect to the database. Check host, port, database name, user and password. (MySQL error ' . ($e->errorInfo[1] ?? $e->getCode()) . ')'];
     }
@@ -106,7 +145,13 @@ function installer_run(array $in): array
     } catch (PDOException $e) {
         return ['Database setup failed: ' . $e->getMessage()];
     }
+    return [];
+}
 
+/** Write config/config.php for ordinary PHP hosting. @return list<string> errors */
+function installer_write_config(string $base, array $db): array
+{
+    $in = ['db' => $db];
     $config = [
         'env'          => 'production',
         'base_url'     => $base,

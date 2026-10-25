@@ -17,6 +17,8 @@ Without Apache you can run the built-in server: `php -S localhost:8000 router.ph
 
 Production deployment, cron and hardening: **[docs/DEPLOYMENT.md](docs/DEPLOYMENT.md)**.
 
+Deploying on Vercel, which needs an external MySQL database and environment variables: **[docs/VERCEL.md](docs/VERCEL.md)**.
+
 ## What's inside
 
 | Area | Where |

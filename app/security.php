@@ -54,6 +54,96 @@ function session_cookie_options(array $o): array
     return $o;
 }
 
+/**
+ * Sessions live in storage/sessions by default. On serverless hosts (session_driver = db)
+ * they live in the `sessions` table, because each function instance has its own disk.
+ */
+function use_session_storage(): void
+{
+    if (config('session_driver', 'files') === 'db') {
+        session_set_save_handler(new DbSessionHandler(), true);
+        return;
+    }
+    $sessDir = storage_path('sessions');
+    if (is_dir($sessDir) && is_writable($sessDir)) {
+        session_save_path($sessDir);
+    }
+}
+
+final class DbSessionHandler implements SessionHandlerInterface, SessionUpdateTimestampHandlerInterface
+{
+    public function open(string $path, string $name): bool
+    {
+        return true;
+    }
+
+    public function close(): bool
+    {
+        return true;
+    }
+
+    /** Set when the database fails, so shutdown writes do not throw (and re-render the error page). */
+    private bool $broken = false;
+
+    public function read(string $id): string|false
+    {
+        return $this->safe('', fn() => (string)(q_val('SELECT data FROM sessions WHERE id = ? AND expires_at > ?', [$this->key($id), time()]) ?? ''));
+    }
+
+    public function write(string $id, string $data): bool
+    {
+        return $this->safe(false, function () use ($id, $data) {
+            q('INSERT INTO sessions (id, data, expires_at) VALUES (?, ?, ?)
+               ON DUPLICATE KEY UPDATE data = VALUES(data), expires_at = VALUES(expires_at)',
+                [$this->key($id), $data, time() + (int)ini_get('session.gc_maxlifetime')]);
+            return true;
+        });
+    }
+
+    public function destroy(string $id): bool
+    {
+        return $this->safe(false, function () use ($id) {
+            q('DELETE FROM sessions WHERE id = ?', [$this->key($id)]);
+            return true;
+        });
+    }
+
+    public function gc(int $max_lifetime): int|false
+    {
+        return $this->safe(false, fn() => q('DELETE FROM sessions WHERE expires_at < ?', [time()])->rowCount());
+    }
+
+    public function validateId(string $id): bool
+    {
+        return $this->safe(false, fn() => (bool)q_val('SELECT 1 FROM sessions WHERE id = ? AND expires_at > ?', [$this->key($id), time()]));
+    }
+
+    private function safe(mixed $fallback, callable $fn): mixed
+    {
+        if ($this->broken) {
+            return $fallback;
+        }
+        try {
+            return $fn();
+        } catch (Throwable $e) {
+            $this->broken = true;
+            app_log('error', 'Session storage failed: ' . $e->getMessage());
+            return $fallback;
+        }
+    }
+
+    public function updateTimestamp(string $id, string $data): bool
+    {
+        return $this->write($id, $data);
+    }
+
+    /** Session ids are stored hashed, so a database leak does not expose live sessions. */
+    private function key(string $id): string
+    {
+        return hash('sha256', $id);
+    }
+}
+
 function start_public_session(): void
 {
     if (session_status() === PHP_SESSION_ACTIVE) {
@@ -62,10 +152,7 @@ function start_public_session(): void
     ini_set('session.use_strict_mode', '1');
     ini_set('session.use_only_cookies', '1');
     ini_set('session.gc_maxlifetime', '86400');
-    $sessDir = storage_path('sessions');
-    if (is_dir($sessDir) && is_writable($sessDir)) {
-        session_save_path($sessDir);
-    }
+    use_session_storage();
     session_name('fm_s');
     session_set_cookie_params(session_cookie_options(cookie_options(0)));
     session_start();
@@ -207,7 +294,10 @@ function run_housekeeping(): array
     q('UPDATE reports SET reporter_ip_hash = NULL WHERE reporter_ip_hash IS NOT NULL AND created_at < DATE_SUB(UTC_TIMESTAMP(), INTERVAL ? DAY)', [$days]);
     q('UPDATE contact_messages SET ip_hash = NULL WHERE ip_hash IS NOT NULL AND created_at < DATE_SUB(UTC_TIMESTAMP(), INTERVAL ? DAY)', [$days]);
     q('UPDATE audit_log SET ip_hash = NULL WHERE ip_hash IS NOT NULL AND created_at < DATE_SUB(UTC_TIMESTAMP(), INTERVAL ? DAY)', [max($days, 90)]);
-    $out['ads_archived'] = q("UPDATE ad_campaigns SET status = 'archived' WHERE status IN ('active','paused') AND ends_at < DATE_SUB(UTC_TIMESTAMP(), INTERVAL 30 DAY)")->rowCount();
+    if (config('session_driver', 'files') === 'db') {
+        $out['sessions'] = q('DELETE FROM sessions WHERE expires_at < ?', [time()])->rowCount();
+    }
+    $out['ads_archived'] =q("UPDATE ad_campaigns SET status = 'archived' WHERE status IN ('active','paused') AND ends_at < DATE_SUB(UTC_TIMESTAMP(), INTERVAL 30 DAY)")->rowCount();
     return $out;
 }
 

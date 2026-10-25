@@ -220,3 +220,20 @@ CREATE TABLE IF NOT EXISTS contact_messages (
   PRIMARY KEY (id),
   KEY idx_msg_status (status, created_at)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- Used when session_driver = 'db' (serverless hosts such as Vercel). Ids are SHA-256 hashed.
+CREATE TABLE IF NOT EXISTS sessions (
+  id         CHAR(64)       NOT NULL,
+  data       MEDIUMBLOB     NOT NULL,
+  expires_at INT UNSIGNED   NOT NULL,
+  PRIMARY KEY (id),
+  KEY idx_sess_exp (expires_at)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- Used when media_driver = 'db' (serverless hosts have no persistent disk).
+CREATE TABLE IF NOT EXISTS media_files (
+  mkey       VARCHAR(80)    NOT NULL,
+  data       MEDIUMBLOB     NOT NULL,
+  created_at DATETIME       NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  PRIMARY KEY (mkey)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;

@@ -21,10 +21,15 @@ if (installer_is_locked()) {
     exit;
 }
 
-session_name('fm_install');
-session_set_cookie_params(['httponly' => true, 'samesite' => 'Strict']);
-session_start();
-$_SESSION['csrf'] ??= bin2hex(random_bytes(16));
+// In environment mode (Vercel) each request may hit a different instance, so the installer
+// keeps no session: the secret SETUP_KEY in every POST already proves who is submitting.
+$envMode = installer_env_mode();
+if (!$envMode) {
+    session_name('fm_install');
+    session_set_cookie_params(['httponly' => true, 'samesite' => 'Strict']);
+    session_start();
+    $_SESSION['csrf'] ??= bin2hex(random_bytes(16));
+}
 
 $h = static fn($v) => htmlspecialchars((string)$v, ENT_QUOTES, 'UTF-8');
 $basePath = rtrim(dirname(dirname($_SERVER['SCRIPT_NAME'] ?? '/install/index.php')), '/\\');
@@ -33,24 +38,26 @@ $guessUrl = $scheme . '://' . ($_SERVER['HTTP_HOST'] ?? 'localhost') . $basePath
 
 $reqs = installer_requirements();
 $reqsOk = !in_array(false, $reqs, true);
-$keyReady = is_writable(dirname(__DIR__) . '/storage') ? installer_setup_key() !== '' : false;
+$keyReady = $envMode ? installer_setup_key() !== '' : (is_writable(dirname(__DIR__) . '/storage') ? installer_setup_key() !== '' : false);
 $errors = [];
 $done = false;
 $old = $_POST;
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && $reqsOk) {
-    $attempts = $_SESSION['attempts'] = ($_SESSION['attempts'] ?? 0) + 1;
+    $attempts = $envMode ? 0 : ($_SESSION['attempts'] = ($_SESSION['attempts'] ?? 0) + 1);
     if ($attempts > 10) {
         $errors[] = 'Too many attempts. Close the browser and try again later.';
-    } elseif (!hash_equals($_SESSION['csrf'], (string)($_POST['csrf'] ?? ''))) {
+    } elseif (!$envMode && !hash_equals($_SESSION['csrf'], (string)($_POST['csrf'] ?? ''))) {
         $errors[] = 'Session expired — reload the page.';
-    } elseif (!hash_equals(installer_setup_key(), trim((string)($_POST['setup_key'] ?? '')))) {
-        $errors[] = 'The setup key is incorrect. Open storage/setup-key.txt on your server and copy its contents.';
+    } elseif (installer_setup_key() === '' || !hash_equals(installer_setup_key(), trim((string)($_POST['setup_key'] ?? '')))) {
+        $errors[] = $envMode
+            ? 'The setup key is incorrect. Enter the value of the SETUP_KEY environment variable.'
+            : 'The setup key is incorrect. Open storage/setup-key.txt on your server and copy its contents.';
     } elseif (($_POST['admin_password'] ?? '') !== ($_POST['admin_password2'] ?? '')) {
         $errors[] = 'The two administrator passwords do not match.';
     } else {
         $errors = installer_run([
-            'base_url' => (string)($_POST['base_url'] ?? ''),
+            'base_url' => $envMode ? (env_config()['base_url'] ?: $guessUrl) : (string)($_POST['base_url'] ?? ''),
             'db' => [
                 'host' => trim((string)($_POST['db_host'] ?? 'localhost')),
                 'port' => (int)($_POST['db_port'] ?? 3306),
@@ -64,7 +71,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && $reqsOk) {
             'contact_email' => (string)($_POST['contact_email'] ?? ''),
         ]);
         $done = !$errors;
-        if ($done) {
+        if ($done && !$envMode) {
             session_destroy();
         }
     }
@@ -88,8 +95,12 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && $reqsOk) {
   <p>Next steps:</p>
   <ol class="steps-list">
     <li>Sign in to the <a href="<?= $h($basePath) ?>/admin/">admin dashboard</a> with the account you just created.</li>
+<?php if ($envMode): ?>
+    <li>The daily maintenance job runs through Vercel Cron (see <code>vercel.json</code>).</li>
+<?php else: ?>
     <li>Optionally delete the <code>install/</code> folder from the server.</li>
     <li>Add the maintenance cron job described in <code>docs/DEPLOYMENT.md</code>.</li>
+<?php endif; ?>
   </ol>
   <p><a class="btn btn-primary" href="<?= $h($basePath) ?>/">Open the site</a></p>
 <?php else: ?>
@@ -109,6 +120,12 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && $reqsOk) {
 
   <?php if ($reqsOk): ?>
   <form method="post" class="card pad form-stack" autocomplete="off">
+<?php if ($envMode): ?>
+    <h2>1 · Setup key</h2>
+    <p class="muted">Enter the value of the <code>SETUP_KEY</code> environment variable you set for this deployment. Database settings are read from the environment, so only the administrator account is needed here.</p>
+    <label class="field"><span>Setup key</span><input name="setup_key" type="password" required <?= $keyReady ? '' : 'disabled' ?>></label>
+    <label class="field"><span>Public contact email (optional)</span><input type="email" name="contact_email" value="<?= $h($old['contact_email'] ?? '') ?>"></label>
+<?php else: ?>
     <input type="hidden" name="csrf" value="<?= $h($_SESSION['csrf']) ?>">
     <h2>1 · Setup key</h2>
     <p class="muted">A one-time key was written to <code>storage/setup-key.txt</code> on your server. Open it with your hosting file manager or FTP and paste it here. This proves you control the server.</p>
@@ -128,8 +145,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && $reqsOk) {
       <label class="field"><span>User</span><input name="db_user" required value="<?= $h($old['db_user'] ?? '') ?>"></label>
       <label class="field"><span>Password</span><input name="db_pass" type="password"></label>
     </div>
+<?php endif; ?>
 
-    <h2>4 · Super administrator</h2>
+    <h2><?= $envMode ? '2' : '4' ?> · Super administrator</h2>
     <label class="field"><span>Name</span><input name="admin_name" required value="<?= $h($old['admin_name'] ?? '') ?>"></label>
     <label class="field"><span>Email (used to sign in)</span><input name="admin_email" type="email" required value="<?= $h($old['admin_email'] ?? '') ?>"></label>
     <div class="grid-2">

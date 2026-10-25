@@ -24,6 +24,11 @@ function storage_path(string $sub = ''): string
 
 function app_log(string $level, string $message): void
 {
+    if (config('log', 'file') === 'stderr') {
+        // Serverless: the platform collects stderr (Vercel → Logs).
+        @file_put_contents('php://stderr', sprintf("%s: %s\n", strtoupper($level), str_replace(["\r", "\n"], ' ', $message)));
+        return;
+    }
     $dir = storage_path('logs');
     if (!is_dir($dir)) {
         @mkdir($dir, 0750, true);
@@ -167,7 +172,7 @@ function app_secret(): string
 {
     $s = (string)config('app_secret', '');
     if (strlen($s) < 32) {
-        throw new RuntimeException('app_secret is missing or too short in config/config.php');
+        throw new RuntimeException('app_secret is missing or too short (config/config.php or the APP_SECRET environment variable)');
     }
     return $s;
 }

@@ -68,6 +68,79 @@
   var focusEl = $('[data-focus-on-load]');
   if (focusEl) { focusEl.focus(); }
 
+  /* ---------- browser-side photo resizing ----------
+     Photos are resized and re-encoded to JPEG before upload. This keeps requests under
+     serverless body limits (Vercel: 4.5 MB), speeds up uploads, applies the camera's
+     orientation and drops EXIF/GPS metadata. The server still validates every file. */
+  var canShrink = !!(window.DataTransfer && window.HTMLCanvasElement && HTMLCanvasElement.prototype.toBlob);
+
+  function decodeImage(file) {
+    if (window.createImageBitmap) {
+      return createImageBitmap(file, { imageOrientation: 'from-image' }).catch(function () { return loadImg(file); });
+    }
+    return loadImg(file);
+  }
+  function loadImg(file) {
+    return new Promise(function (resolve, reject) {
+      var img = new Image(), u = URL.createObjectURL(file);
+      img.onload = function () { URL.revokeObjectURL(u); resolve(img); };
+      img.onerror = function () { URL.revokeObjectURL(u); reject(new Error('decode')); };
+      img.src = u;
+    });
+  }
+  /** Resolves to a JPEG File no larger than maxW × maxH, or the original file if anything fails. */
+  function shrinkFile(file, maxW, maxH, quality) {
+    if (!canShrink || !/^image\/(jpeg|png|webp)$/.test(file.type)) return Promise.resolve(file);
+    return decodeImage(file).then(function (src) {
+      var w = src.width, h = src.height, s = Math.min(1, maxW / w, maxH / h);
+      var c = document.createElement('canvas');
+      c.width = Math.max(1, Math.round(w * s)); c.height = Math.max(1, Math.round(h * s));
+      var ctx = c.getContext('2d');
+      ctx.fillStyle = '#0C0727'; ctx.fillRect(0, 0, c.width, c.height); // brand navy behind transparency
+      ctx.drawImage(src, 0, 0, c.width, c.height);
+      if (src.close) src.close();
+      return new Promise(function (resolve) {
+        c.toBlob(function (b) {
+          resolve(b ? new File([b], file.name.replace(/\.[^.]*$/, '') + '.jpg', { type: 'image/jpeg' }) : file);
+        }, 'image/jpeg', quality);
+      });
+    }).catch(function () { return file; });
+  }
+  /** Replace each input's file with a resized copy; retries smaller until all fit in budgetBytes. */
+  function shrinkInputs(inputs, budgetBytes) {
+    var originals = inputs.map(function (i) { return i.files[0]; });
+    var passes = [[1, 0.85], [0.84, 0.75], [0.67, 0.65], [0.5, 0.6]];
+    function run(p) {
+      return Promise.all(inputs.map(function (inp, k) {
+        var dims = (inp.dataset.shrink || '1200x1500').split('x');
+        return shrinkFile(originals[k], +dims[0] * passes[p][0], +dims[1] * passes[p][0], passes[p][1]);
+      })).then(function (files) {
+        var total = files.reduce(function (n, f) { return n + f.size; }, 0);
+        if (total > budgetBytes && p + 1 < passes.length) return run(p + 1);
+        files.forEach(function (f, k) {
+          var dt = new DataTransfer(); dt.items.add(f); inputs[k].files = dt.files;
+        });
+      });
+    }
+    return run(0);
+  }
+  function fileInputsWithFiles(form) {
+    return $$('input[type=file]', form).filter(function (i) { return i.files && i.files.length; });
+  }
+  /* Generic forms (admin ad banners): shrink once, then resubmit with the same submit button. */
+  document.addEventListener('submit', function (e) {
+    var f = e.target.closest('form[data-shrink-images]');
+    if (!f || f._shrunk || e.defaultPrevented || !canShrink) return;
+    var inputs = fileInputsWithFiles(f);
+    if (!inputs.length) return;
+    e.preventDefault();
+    var submitter = e.submitter;
+    shrinkInputs(inputs, 4 * 1048576).then(function () {
+      f._shrunk = true;
+      if (f.requestSubmit) f.requestSubmit(submitter || undefined); else f.submit();
+    });
+  });
+
   /* ---------- create form ---------- */
   var form = $('[data-create-form]');
   if (form) initCreate(form);
@@ -118,7 +191,9 @@
     };
     function checkFile(f) {
       if (['image/jpeg', 'image/png', 'image/webp'].indexOf(f.type) < 0) return 'Use a JPG, PNG or WebP image.';
-      if (f.size > maxMb * 1048576) return 'This photo is larger than ' + maxMb + ' MB.';
+      // Large originals are fine when the browser can resize them before upload.
+      var limitMb = canShrink ? Math.max(maxMb, 30) : maxMb;
+      if (f.size > limitMb * 1048576) return 'This photo is larger than ' + limitMb + ' MB.';
       return null;
     }
     function rowError(r, msg) {
@@ -156,8 +231,16 @@
         return;
       }
       err.hidden = true;
-      var btn = $('[data-submit]', form); btn.classList.add('is-busy'); btn.textContent = 'Uploading photos…';
+      var btn = $('[data-submit]', form); btn.classList.add('is-busy');
       $('[data-submit-note]', form).textContent = 'This can take a moment on slow connections.';
+      if (!canShrink || form._shrunk) { btn.textContent = 'Uploading photos…'; return; }
+      // Resize every photo first; the whole request must stay under ~4 MB.
+      e.preventDefault();
+      btn.disabled = true; btn.textContent = 'Preparing photos…';
+      shrinkInputs(fileInputsWithFiles(form), 3.8 * 1048576).then(function () {
+        form._shrunk = true; btn.disabled = false; btn.textContent = 'Uploading photos…';
+        form.submit();
+      });
     });
   }
 

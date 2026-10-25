@@ -47,10 +47,7 @@ function admin_session_start(): void
     }
     ini_set('session.use_strict_mode', '1');
     ini_set('session.use_only_cookies', '1');
-    $sessDir = storage_path('sessions');
-    if (is_dir($sessDir) && is_writable($sessDir)) {
-        session_save_path($sessDir);
-    }
+    use_session_storage();
     session_name('fm_admin');
     $opts = cookie_options(0, base_path() . '/admin/');
     $opts['samesite'] = 'Strict';

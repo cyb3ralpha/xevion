@@ -90,12 +90,12 @@ try {
 
     section('Image uploads');
     $p = store_participant_photo(fake_upload(800, 1000, 'jpeg'));
-    check('stores full and thumb', media_abs_path($p['image']) !== null && media_abs_path($p['thumb']) !== null);
-    [$tw, $th] = getimagesize(media_abs_path($p['thumb']));
+    check('stores full and thumb', media_locate($p['image']) !== null && media_locate($p['thumb']) !== null);
+    [$tw, $th] = getimagesize(media_locate($p['thumb']));
     check('thumb is 480x600', $tw === 480 && $th === 600, "$tw x $th");
     delete_media($p['image']);
     delete_media($p['thumb']);
-    check('delete_media removes file', media_abs_path($p['image']) === null);
+    check('delete_media removes file', media_locate($p['image']) === null);
     $txt = tempnam(sys_get_temp_dir(), 'fmt');
     file_put_contents($txt, "<?php echo 'x'; ?>");
     $tmpFiles[] = $txt;
@@ -111,7 +111,7 @@ try {
     } catch (UploadError $e) {
         check('rejects tiny image', true);
     }
-    check('rejects path traversal in media lookup', media_abs_path('../config/config.php') === null);
+    check('rejects path traversal in media lookup', media_locate('../config/config.php') === null);
 
     section('Creation and access');
     $r = make_comp();
@@ -270,14 +270,14 @@ try {
     $minor = q_one('SELECT * FROM participants WHERE id = ?', [$mp[1]['id']]);
     report_auto_triage(null, $minor, 'minor');
     check('a single "under 18" report hides the photo immediately', q_val('SELECT image_status FROM participants WHERE id = ?', [$mp[1]['id']]) === 'escalated');
-    $file = media_abs_path($mp[2]['image_file']);
+    $file = media_locate($mp[2]['image_file']);
     participant_remove_image((int)$mp[2]['id'], 'test', null);
     check('removing a participant deletes the photo file', $file && !is_file($file));
     check('removed participant leaves rankings', count(ranking_compute((int)$mc['id'])['rows']) === 2);
 
     section('Deletion');
     $dc = make_comp([], 2);
-    $files = array_map(static fn($p) => media_abs_path($p['image_file']), comp_participants((int)$dc['comp']['id']));
+    $files = array_map(static fn($p) => media_locate($p['image_file']), comp_participants((int)$dc['comp']['id']));
     comp_soft_delete((int)$dc['comp']['id']);
     fresh_session();
     grant_creator($dc['comp']);
