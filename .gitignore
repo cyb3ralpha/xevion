@@ -1,0 +1,7 @@
+config/config.php
+storage/media/*
+storage/logs/*
+storage/sessions/*
+storage/installed.lock
+storage/setup-key.txt
+!storage/**/.gitkeep

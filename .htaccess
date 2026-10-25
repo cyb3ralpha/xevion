@@ -1,0 +1,48 @@
+# XEVION FaceMatch — Apache configuration (Apache 2.4, mod_rewrite)
+Options -Indexes -MultiViews
+DirectoryIndex index.php
+AddDefaultCharset UTF-8
+
+<IfModule mod_rewrite.c>
+  RewriteEngine On
+
+  # Uncomment if your host requires it (set to the folder you installed into):
+  # RewriteBase /
+
+  # Force HTTPS (uncomment once your certificate is active)
+  # RewriteCond %{HTTPS} !=on
+  # RewriteRule ^ https://%{HTTP_HOST}%{REQUEST_URI} [L,R=301]
+
+  # Private folders and dotfiles are never web-accessible.
+  RewriteRule ^(app|config|storage|database|templates|cli|tests|docs)(/|$) - [F,L]
+  RewriteRule (^|/)\.(?!well-known/) - [F,L]
+  RewriteRule \.(sql|md|log|lock|ini|sh|dist)$ - [F,L,NC]
+
+  # Only the three entry points may execute PHP directly.
+  RewriteCond %{REQUEST_URI} \.ph(p|tml|ar)$ [NC]
+  RewriteCond %{REQUEST_URI} !(^|/)(index\.php|admin/index\.php|install/index\.php)$ [NC]
+  RewriteRule ^ - [F,L]
+
+  # Real static files (assets, robots.txt) are served directly.
+  RewriteCond %{REQUEST_FILENAME} -f
+  RewriteRule ^ - [L]
+
+  RewriteRule ^admin(/.*)?$ admin/index.php [L,QSA]
+  RewriteRule ^install/?$ install/index.php [L,QSA]
+  RewriteRule ^ index.php [L,QSA]
+</IfModule>
+
+<IfModule mod_headers.c>
+  Header always set X-Content-Type-Options "nosniff"
+  <FilesMatch "\.(css|js|woff2|png|jpg|webp|svg)$">
+    Header set Cache-Control "public, max-age=2592000"
+  </FilesMatch>
+</IfModule>
+
+<IfModule mod_php.c>
+  php_value upload_max_filesize 8M
+  php_value post_max_size 120M
+  php_value max_file_uploads 25
+  php_value max_execution_time 120
+  php_flag expose_php off
+</IfModule>

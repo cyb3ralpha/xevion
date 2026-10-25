@@ -1,0 +1,7 @@
+# Static assets only: never execute scripts from here.
+<FilesMatch "\.(php|phtml|phar|pl|py|cgi|sh)$">
+  <IfModule mod_authz_core.c>
+    Require all denied
+  </IfModule>
+</FilesMatch>
+Options -Indexes -ExecCGI
