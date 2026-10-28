@@ -16,11 +16,10 @@ XEVION FaceMatch is a photo face-off site. Visitors create a match from 2 to 20 
 |---|---|
 | `index.php` | Public front controller and route table |
 | `admin/index.php` | Admin front controller |
-| `install/index.php` | One-time web installer (classic hosting); on Vercel it is optional |
-| `api/index.php` | Vercel entry point; dispatches to the three controllers above |
+| `api/index.php` | Vercel entry point; dispatches to the two controllers above |
 | `app/bootstrap.php` | Loads config (file or environment), helpers, error handling, auto-setup |
 | `app/env_config.php` | Settings from environment variables (Vercel) |
-| `app/auto_setup.php` | Vercel first-run setup: tables, app secret, first admin |
+| `app/auto_setup.php` | First-run setup on every host: tables, app secret, first admin |
 | `app/uploads.php` | Image validation, GD re-encoding or no-GD metadata stripping, file or DB storage |
 | `app/security.php` | Sessions (file or DB), CSRF, rate limits, abuse blocks, housekeeping |
 | `app/controllers/public.php`, `admin.php` | Page handlers |
@@ -28,8 +27,8 @@ XEVION FaceMatch is a photo face-off site. Visitors create a match from 2 to 20 
 | `assets/css/app.css` | All public styles; the "Visual & motion layer" section holds the animations |
 | `assets/js/app.js` | Progressive enhancement: reveals, ticker, create form, photo resizing, arena |
 | `database/schema.sql` | Idempotent schema (`CREATE TABLE IF NOT EXISTS`) |
-| `tests/run.php` | 90 engine checks against the configured database; cleans up after itself |
-| `docs/` | `DEPLOYMENT.md`, `VERCEL.md`, `SECURITY.md`, `ADMIN.md`, `VOTING.md` |
+| `docs/` | `DEPLOYMENT.md`, `VERCEL.md`, `SECURITY.md`, `ADMIN.md`, `VOTING.md`; original logo files in `docs/brand/` |
+| `router.php` | Router for PHP's built-in server (`php -S localhost:8000 router.php`) |
 
 ## Local development (XAMPP on Windows)
 
@@ -43,7 +42,6 @@ XEVION FaceMatch is a photo face-off site. Visitors create a match from 2 to 20 
 Commands:
 
 ```bash
-php tests/run.php                       # engine tests; must stay at 90 passed
 php -l path/to/file.php                 # lint after editing PHP
 php -S localhost:8090 api/index.php     # Vercel-style local run (see docs/VERCEL.md)
 ```
@@ -51,7 +49,7 @@ php -S localhost:8090 api/index.php     # Vercel-style local run (see docs/VERCE
 ## Vercel deployment
 
 - `vercel.json` uses the community runtime `vercel-php@0.8.0` (PHP 8.4). Routes send `/assets/*` and `robots.txt` to static files and everything else to `api/index.php`, so source files are never served.
-- With no `config/config.php`, settings come from environment variables. Required: `DATABASE_URL` (or `DB_HOST`, `DB_PORT`, `DB_NAME`, `DB_USER`, `DB_PASSWORD`; provider names like `MYSQL_URL` and `MYSQLHOST` also work), `ADMIN_EMAIL`, `ADMIN_PASSWORD` (12+ characters). Optional: `APP_SECRET`, `CRON_SECRET`, `BASE_URL`, `DB_SSL`, `SETUP_KEY`.
+- With no `config/config.php`, settings come from environment variables. Required: `DATABASE_URL` (or `DB_HOST`, `DB_PORT`, `DB_NAME`, `DB_USER`, `DB_PASSWORD`; provider names like `MYSQL_URL` and `MYSQLHOST` also work), `ADMIN_EMAIL`, `ADMIN_PASSWORD` (12+ characters). Optional: `APP_SECRET`, `CRON_SECRET`, `BASE_URL`, `DB_SSL`, `ADMIN_NAME`.
 - First request runs `auto_setup_boot()`: applies the schema, stores a generated app secret in `app_meta` when `APP_SECRET` is unset, and creates the super admin from the environment. Bump `SCHEMA_VERSION` in `app/auto_setup.php` whenever `database/schema.sql` changes.
 - On Vercel, sessions live in the `sessions` table and photos in `media_files`. Logs go to stderr.
 - The Vercel PHP runtime has no GD or Imagick. The browser resizes photos to JPEG before upload, which also keeps requests under Vercel's 4.5 MB limit. PHP then strips EXIF, XMP, comments and PNG text chunks. Thumbnails reuse the full photo there.
@@ -88,6 +86,8 @@ Headless Chrome will not lay out narrower than 512px with `--window-size`. For r
 9. **Oct 28: Home link.** Added a "Home" link with a house icon as the first item in the main navigation. It is highlighted on the home page.
 
 10. **Oct 28: rollback incident.** Production (www.xevion.pk, xevion-delta.vercel.app) had been rolled back to commit c1bd9a6, which has no vercel.json, so Vercel served index.php as a download. The rollback also disabled automatic production updates. Fix is in the Vercel dashboard: promote the newest deployment. Added a troubleshooting section to docs/VERCEL.md.
+
+11. **Oct 28: clean structure.** The owner deleted `cli/`, `install/`, `tests/`, `config/config.sample.php` and `storage/sessions/`. To keep setup working everywhere, the automatic first-visit setup now runs on every host: ordinary hosting reads `admin_email` and `admin_password` from `config/config.php`, Vercel reads `ADMIN_EMAIL` and `ADMIN_PASSWORD`. Removed `app/installer.php`, the `/install` routes and `SETUP_KEY`; moved the unused original logo files to `docs/brand/`; removed the duplicate `docs/CLUADE.md`; rewrote the README with a structure overview and updated all guides. Maintenance on ordinary hosting is now a cron job calling `/api/cron`. There is no automated test suite any more; verify changes with HTTP smoke tests.
 
 ## Known limits and open items
 

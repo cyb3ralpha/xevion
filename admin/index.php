@@ -8,9 +8,7 @@ require dirname(__DIR__) . '/app/bootstrap.php';
 require APP_ROOT . '/app/admin_auth.php';
 require APP_ROOT . '/app/controllers/admin.php';
 
-if (config('from_env')) {
-    ensure_env_admin(); // picks up ADMIN_EMAIL / ADMIN_PASSWORD added after the first deploy
-}
+ensure_first_admin(); // picks up an admin email/password added after the first visit
 admin_session_start();
 send_security_headers(true);
 header('Cache-Control: no-store');

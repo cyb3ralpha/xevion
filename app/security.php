@@ -279,7 +279,7 @@ function send_security_headers(bool $noindex = false): void
 /**
  * Periodic maintenance: closes expired competitions, purges stale rate-limit rows
  * and clears IP-derived keys after the retention period. Called opportunistically
- * (≈2% of requests) and by cli/maintenance.php for cron.
+ * (≈2% of requests) and by the /api/cron endpoint.
  */
 function run_housekeeping(): array
 {

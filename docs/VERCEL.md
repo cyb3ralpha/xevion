@@ -6,12 +6,12 @@ Vercel has no built-in PHP and no MySQL, and its servers have no permanent disk.
 |---|---|---|
 | PHP | Apache + mod_php | Community runtime `vercel-php` (PHP 8.4), see `vercel.json` |
 | Routing | `.htaccess` | `vercel.json` sends everything except `/assets/*` and `robots.txt` to `api/index.php` |
-| Settings | `config/config.php` written by the installer | Environment variables |
+| Settings | `config/config.php` | Environment variables |
 | Sessions | `storage/sessions/` | `sessions` table |
 | Photos and banners | `storage/media/` | `media_files` table |
 | Logs | `storage/logs/` | stderr (Vercel → Logs) |
 | Image processing | GD re-encodes every photo | The browser resizes to JPEG; PHP validates and strips all metadata (GD is not available on Vercel) |
-| Maintenance | cron runs `cli/maintenance.php` | Vercel Cron calls `/api/cron` daily |
+| Maintenance | A cron job calls `/api/cron` | Vercel Cron calls `/api/cron` daily |
 
 ## 1. Create a MySQL database
 
@@ -47,7 +47,7 @@ There is no installation step. The first visit creates the tables, the applicati
 
 If the variables are missing, the site shows **Database not connected** with the list above. If they are wrong, it shows **Cannot reach the database**, and the Vercel function logs give the MySQL error code.
 
-Without `ADMIN_EMAIL`/`ADMIN_PASSWORD` you can still create the administrator at `/install`, using a `SETUP_KEY` variable as the one-time key.
+If you add `ADMIN_EMAIL` and `ADMIN_PASSWORD` later, the account is created on the next visit to `/admin/`.
 
 Later deploys that add tables apply them automatically.
 
@@ -76,7 +76,7 @@ Run PHP's built-in server with environment variables instead of `config/config.p
 
 ```bash
 APP_CONFIG_FROM_ENV=1 VERCEL=1 DB_SSL=0 DB_HOST=127.0.0.1 DB_NAME=facematch_test DB_USER=... DB_PASSWORD=... \
-APP_SECRET=... SETUP_KEY=... php -S localhost:8090 api/index.php
+ADMIN_EMAIL=... ADMIN_PASSWORD=... php -S localhost:8090 api/index.php
 ```
 
 `APP_CONFIG_FROM_ENV=1` makes the environment win even when `config/config.php` exists.

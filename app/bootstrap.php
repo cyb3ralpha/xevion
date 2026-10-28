@@ -1,7 +1,7 @@
 <?php
 /**
  * XEVION FaceMatch — application bootstrap.
- * Loaded by every entry point (index.php, admin/index.php, cli/*, tests/*).
+ * Loaded by every entry point (index.php, admin/index.php, api/index.php, tests/run.php).
  */
 declare(strict_types=1);
 
@@ -16,7 +16,7 @@ $configFile = APP_ROOT . '/config/config.php';
 $useEnv = env_config_available() && (!is_file($configFile) || env_bool('APP_CONFIG_FROM_ENV', false));
 if (!$useEnv && !is_file($configFile)) {
     if (PHP_SAPI === 'cli') {
-        fwrite(STDERR, "XEVION FaceMatch is not installed. Run: php cli/install.php\n");
+        fwrite(STDERR, "XEVION FaceMatch is not configured. Create config/config.php as described in docs/DEPLOYMENT.md.\n");
         exit(1);
     }
     http_response_code(503);
@@ -35,13 +35,13 @@ if (!$useEnv && !is_file($configFile)) {
            . '<p style="opacity:.75">Tables are created on the first visit after that.</p></div>';
         exit;
     }
-    $base = rtrim(str_replace('\\', '/', dirname($_SERVER['SCRIPT_NAME'] ?? '/')), '/');
-    if (str_ends_with($base, '/admin')) { $base = substr($base, 0, -6); }
-    echo '<!doctype html><meta charset="utf-8"><title>Setup required</title>'
-       . '<body style="font-family:system-ui;background:#0C0727;color:#fff;display:grid;place-items:center;min-height:100vh;margin:0">'
-       . '<div style="max-width:420px;text-align:center"><h1>Setup required</h1>'
-       . '<p>XEVION FaceMatch has not been installed yet.</p>'
-       . '<p><a style="color:#188CF1" href="' . htmlspecialchars($base, ENT_QUOTES) . '/install/">Open the installer</a></p></div>';
+    // Ordinary PHP hosting: one config file, then the first visit sets everything up.
+    echo '<!doctype html><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>Configuration needed</title>'
+       . '<body style="font-family:system-ui;background:#0C0727;color:#fff;display:grid;place-items:center;min-height:100vh;margin:0;padding:16px">'
+       . '<div style="max-width:520px"><h1>Configuration needed</h1>'
+       . '<p>Create <code>config/config.php</code> (see <code>docs/DEPLOYMENT.md</code>) with the site address, '
+       . 'the MySQL database details and the first administrator&rsquo;s email and password.</p>'
+       . '<p style="opacity:.75">Tables and the admin account are created on the next visit.</p></div>';
     exit;
 }
 
@@ -87,16 +87,16 @@ set_exception_handler(static function (Throwable $e): void {
     if (!headers_sent()) {
         http_response_code(500);
     }
-    // Environment-configured deployments (Vercel): say clearly when the database is unreachable.
-    if (config('from_env') && $e instanceof RuntimeException && $e->getMessage() === 'Database unavailable' && !is_api_request()) {
+    // Say clearly when the database is unreachable (wrong settings are the usual cause).
+    if ($e instanceof RuntimeException && $e->getMessage() === 'Database unavailable' && !is_api_request()) {
         http_response_code(503);
         header('Cache-Control: no-store');
+        $where = config('from_env') ? 'environment variables in Vercel' : 'settings in config/config.php';
         echo '<!doctype html><meta charset="utf-8"><title>Database unavailable</title>'
            . '<body style="font-family:system-ui;background:#0C0727;color:#fff;display:grid;place-items:center;min-height:100vh;margin:0;padding:16px">'
            . '<div style="max-width:480px"><h1>Cannot reach the database</h1>'
-           . '<p>Check the database environment variables in Vercel (host, port, name, user, password) and that the database '
-           . 'accepts connections from the internet. Set <code>DB_SSL=false</code> only if your database has no TLS. '
-           . 'Details are in the Vercel function logs.</p></div>';
+           . '<p>Check the database ' . $where . ' (host, port, name, user, password) and that the database '
+           . 'accepts connections from this server. The error log has the MySQL error code.</p></div>';
         return;
     }
     if (config('env') === 'development') {
@@ -109,7 +109,5 @@ set_exception_handler(static function (Throwable $e): void {
     render_error(500);
 });
 
-// Vercel and other environment-configured hosts set themselves up on first use.
-if (config('from_env')) {
-    auto_setup_boot();
-}
+// First use creates the tables and the first administrator (see app/auto_setup.php).
+auto_setup_boot();

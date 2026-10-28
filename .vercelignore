@@ -7,5 +7,4 @@ storage/logs/*
 storage/sessions/*
 tests/
 docs/
-cli/
 router.php

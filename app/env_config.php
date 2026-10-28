@@ -89,7 +89,9 @@ function env_config(): array
         'session_driver' => env_str('SESSION_DRIVER', $onVercel ? 'db' : 'files'),
         'media_driver'   => env_str('MEDIA_DRIVER', $onVercel ? 'db' : 'files'),
         'log'            => env_str('LOG_TARGET', $onVercel ? 'stderr' : 'file'),
-        'setup_key'      => env_str('SETUP_KEY'),
+        'admin_email'    => env_str('ADMIN_EMAIL'),
+        'admin_password' => env_str('ADMIN_PASSWORD'),
+        'admin_name'     => env_str('ADMIN_NAME', 'Administrator'),
         'cron_secret'    => env_str('CRON_SECRET'),
         'db'             => $db,
     ];

@@ -1,11 +1,12 @@
 <?php
 /**
- * Zero-step setup for environment-configured hosts (Vercel).
+ * Automatic setup — there is no installer.
  *
- * With only database variables set, the first request creates the tables, an
- * application secret (unless APP_SECRET is set) and, when ADMIN_EMAIL and
- * ADMIN_PASSWORD are set, the first super administrator. Later deploys that change
- * database/schema.sql apply the new tables automatically (bump SCHEMA_VERSION).
+ * On the first request after the database settings are in place (environment
+ * variables on Vercel, or config/config.php on ordinary hosting) the app creates
+ * its tables, an application secret when none is configured, and the first super
+ * administrator from the configured admin email and password. Later deploys that
+ * change database/schema.sql apply the new tables automatically: bump SCHEMA_VERSION.
  */
 declare(strict_types=1);
 
@@ -63,7 +64,6 @@ function auto_meta_cache(array $meta): void
 
 function auto_setup_run(): void
 {
-    require_once APP_ROOT . '/app/installer.php';
     $pdo = db();
     $locked = false;
     try {
@@ -72,11 +72,11 @@ function auto_setup_run(): void
         // Some MySQL-compatible services lack GET_LOCK; every step below is idempotent anyway.
     }
     try {
-        installer_apply_schema($pdo);
+        schema_apply($pdo);
         // INSERT IGNORE keeps the first secret if two instances race; never overwrite it.
         q('INSERT IGNORE INTO app_meta (mkey, mvalue) VALUES (?, ?)', ['app_secret', bin2hex(random_bytes(32))]);
         q('INSERT INTO app_meta (mkey, mvalue) VALUES (?, ?) ON DUPLICATE KEY UPDATE mvalue = VALUES(mvalue)', ['schema_version', SCHEMA_VERSION]);
-        ensure_env_admin();
+        ensure_first_admin();
         app_log('info', 'Automatic setup applied (schema ' . SCHEMA_VERSION . ')');
     } finally {
         if ($locked) {
@@ -85,19 +85,32 @@ function auto_setup_run(): void
     }
 }
 
-/**
- * Create the first super administrator from ADMIN_EMAIL / ADMIN_PASSWORD when none exists.
- * Never changes an existing account, so later password changes in the dashboard stick.
- */
-function ensure_env_admin(): void
+/** Run database/schema.sql. Every statement is CREATE TABLE IF NOT EXISTS, so it is safe to repeat. */
+function schema_apply(PDO $pdo): void
 {
-    $email = strtolower(trim(env_str('ADMIN_EMAIL')));
-    $password = env_str('ADMIN_PASSWORD');
+    $sql = (string)file_get_contents(APP_ROOT . '/database/schema.sql');
+    $sql = preg_replace('/^\s*--.*$/m', '', $sql) ?? '';
+    foreach (preg_split('/;\s*(\r?\n|$)/', $sql) ?: [] as $stmt) {
+        if (trim($stmt) !== '') {
+            $pdo->exec($stmt);
+        }
+    }
+}
+
+/**
+ * Create the first super administrator from the configured admin email and password
+ * (ADMIN_EMAIL / ADMIN_PASSWORD, or admin_email / admin_password in config.php) when
+ * none exists. Never changes an existing account, so later password changes stick.
+ */
+function ensure_first_admin(): void
+{
+    $email = strtolower(trim((string)config('admin_email', '')));
+    $password = (string)config('admin_password', '');
     if ($email === '' || $password === '') {
         return;
     }
     if (!filter_var($email, FILTER_VALIDATE_EMAIL) || strlen($password) < 12) {
-        app_log('warning', 'ADMIN_EMAIL must be valid and ADMIN_PASSWORD at least 12 characters; no administrator created');
+        app_log('warning', 'The admin email must be valid and the admin password at least 12 characters; no administrator created');
         return;
     }
     if ((int)q_val("SELECT COUNT(*) FROM admins WHERE role = 'super_admin'") > 0) {
@@ -106,8 +119,8 @@ function ensure_env_admin(): void
     try {
         q("INSERT INTO admins (email, name, password_hash, role, is_active, password_changed_at)
            VALUES (?, ?, ?, 'super_admin', 1, UTC_TIMESTAMP())",
-            [$email, env_str('ADMIN_NAME', 'Administrator'), password_hash($password, PASSWORD_DEFAULT)]);
-        app_log('info', 'Super administrator created from ADMIN_EMAIL');
+            [$email, (string)config('admin_name', 'Administrator') ?: 'Administrator', password_hash($password, PASSWORD_DEFAULT)]);
+        app_log('info', 'Super administrator created from the configured admin email');
     } catch (PDOException $e) {
         if (!is_duplicate_key($e)) {
             throw $e;

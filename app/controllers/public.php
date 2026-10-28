@@ -779,7 +779,7 @@ function page_terms(): void
 
 /**
  * Called by Vercel Cron (see vercel.json) with "Authorization: Bearer <CRON_SECRET>".
- * On ordinary hosting use cli/maintenance.php from cron instead.
+ * On ordinary hosting, call it from a cron job with the same header (see docs/DEPLOYMENT.md).
  */
 function api_cron(): void
 {

@@ -23,7 +23,7 @@ Grants in a session remember which token hash produced them, so revoking or rege
 - **Outbound links:** ad and sponsor URLs must be absolute `http(s)` with no credentials or control characters; clicks go through `/go/{id}`.
 - **Headers:** HSTS on HTTPS, `X-Frame-Options: DENY`, `Referrer-Policy` (`no-referrer` on invite and management pages), `Permissions-Policy`, `noindex` on private, admin and management pages (as an extra layer, not as access control).
 - **Errors:** production shows generic error pages; details go to `storage/logs/` (never web-accessible). Database connection errors don't reveal host or user.
-- **Installer:** requires a setup key readable only from the server's filesystem; disables itself after success.
+- **Setup:** there is no installer page. The first administrator comes only from server-side configuration (environment variables or `config/config.php`) and is created only while no super administrator exists.
 - **Audit log:** every admin action, creator management action and automatic moderation action is recorded with actor, target and details. There is no way to edit or delete entries from the application.
 
 ## Personal data and retention

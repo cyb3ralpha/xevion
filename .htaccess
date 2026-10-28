@@ -14,13 +14,13 @@ AddDefaultCharset UTF-8
   # RewriteRule ^ https://%{HTTP_HOST}%{REQUEST_URI} [L,R=301]
 
   # Private folders and dotfiles are never web-accessible.
-  RewriteRule ^(app|config|storage|database|templates|cli|tests|docs)(/|$) - [F,L]
+  RewriteRule ^(app|config|storage|database|templates|tests|docs)(/|$) - [F,L]
   RewriteRule (^|/)\.(?!well-known/) - [F,L]
   RewriteRule \.(sql|md|log|lock|ini|sh|dist)$ - [F,L,NC]
 
-  # Only the three entry points may execute PHP directly.
+  # Only the two entry points may execute PHP directly.
   RewriteCond %{REQUEST_URI} \.ph(p|tml|ar)$ [NC]
-  RewriteCond %{REQUEST_URI} !(^|/)(index\.php|admin/index\.php|install/index\.php)$ [NC]
+  RewriteCond %{REQUEST_URI} !(^|/)(index\.php|admin/index\.php)$ [NC]
   RewriteRule ^ - [F,L]
 
   # Real static files (assets, robots.txt) are served directly.
@@ -28,7 +28,6 @@ AddDefaultCharset UTF-8
   RewriteRule ^ - [L]
 
   RewriteRule ^admin(/.*)?$ admin/index.php [L,QSA]
-  RewriteRule ^install/?$ install/index.php [L,QSA]
   RewriteRule ^ index.php [L,QSA]
 </IfModule>
 
