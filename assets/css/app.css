@@ -542,3 +542,6 @@ main { animation: page-in .55s var(--ease) both; }
   .js [data-reveal] { opacity: 1; transform: none; }
   .aurora span, .grad-text, .btn-shine::after, .cta-band, .vote-meter i, main { animation: none !important; }
 }
+
+/* nav links with icons */
+.nav-links a { display: inline-flex; align-items: center; gap: 6px; }

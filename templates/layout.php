@@ -33,6 +33,7 @@ $navCurrent = static fn(string $p) => ($path === $p || ($p !== '/' && str_starts
     </a>
     <button class="nav-toggle" type="button" aria-expanded="false" aria-controls="nav-links" data-nav-toggle>Menu</button>
     <div class="nav-links" id="nav-links">
+      <a href="<?= e(url('/')) ?>"<?= $navCurrent('/') ?>><?= icon('home') ?> Home</a>
       <a href="<?= e(url('/explore')) ?>"<?= $navCurrent('/explore') ?>>Explore</a>
       <a href="<?= e(url('/') . '#categories') ?>">Categories</a>
       <a href="<?= e(url('/') . '#how') ?>">How it works</a>

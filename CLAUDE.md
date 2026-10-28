@@ -85,6 +85,8 @@ Headless Chrome will not lay out narrower than 512px with `--window-size`. For r
 7. **Oct 27: Vercel readiness check.** Audited for PHP 8.4 issues and disk writes, read the `vercel-php` launcher source, added the "Deploy with Vercel" button, and ran a full end-to-end in Vercel mode.
 8. **Oct 28: animated redesign.** New hero with a drifting aurora, gradient headline, rotating category question, floating category labels, animated vote meter and shiny buttons. Line icons replaced emojis everywhere. Card and tile hover motion, scroll reveals, a sticky header that gains a shadow on scroll, and a closing call-to-action band that replaces the old empty-state box. Removed clutter: the "A XEVION product" eyebrow, the preview caption, the Explore category dropdown that duplicated the chips, and "(0)" chip counts. Fixed stretched contender and winner photos.
 
+9. **Oct 28: Home link.** Added a "Home" link with a house icon as the first item in the main navigation. It is highlighted on the home page.
+
 ## Known limits and open items
 
 - The live Vercel deployment could not be inspected: the owner's Vercel project is not visible to the connected Vercel account.
