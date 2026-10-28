@@ -19,7 +19,6 @@ function setting_defaults(): array
         'ip_pair_limit_per_day'    => '8',
         'report_escalate_threshold' => '3',
         'ip_retention_days'        => '30',
-        'show_house_ad'            => '1',
         'blocked_terms'            => implode("\n", [
             // Body-shaming / degrading comparisons
             'ugliest', 'ugly', 'fattest', 'fat', 'fatty', 'skinniest', 'dumbest', 'stupidest', 'stupid', 'retard', 'retarded',

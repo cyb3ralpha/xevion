@@ -103,7 +103,6 @@ main { flex: 1; }
 .ad-text strong { color: #fff; font-family: var(--font-display); }
 .ad-text .ad-cta { margin-left: auto; color: var(--x-blue-hi); font-weight: 600; }
 .ad-advertiser { font-size: .78rem; color: var(--x-faint); }
-.ad-house { color: var(--x-muted); font-size: .9rem; }
 
 /* ---------- buttons & forms ---------- */
 .btn { white-space: nowrap; display: inline-flex; align-items: center; justify-content: center; gap: 8px; font: 600 .98rem/1 var(--font-display); padding: 13px 22px; border-radius: 999px; border: 1px solid transparent; text-decoration: none; cursor: pointer; transition: transform .15s var(--ease), box-shadow .2s, background .2s; color: #fff; }
@@ -164,7 +163,7 @@ input:focus, select:focus, textarea:focus { outline: none; border-color: var(--x
 .pill-private { color: #C9B8FF; border-color: rgba(201,184,255,.35); }
 
 /* ---------- hero ---------- */
-.hero { padding: 64px 0 24px; }
+.hero { padding: 64px 0 24px; overflow-x: clip; } /* the preview photos slide in from the sides */
 .hero-grid { display: grid; grid-template-columns: 1.05fr .95fr; gap: 48px; align-items: center; }
 .hero h1 { max-width: 13ch; }
 .hero-lede { font-size: 1.15rem; color: var(--x-muted); max-width: 46ch; margin-bottom: 28px; }
@@ -212,10 +211,12 @@ input:focus, select:focus, textarea:focus { outline: none; border-color: var(--x
 .match-meta .sep { color: var(--x-faint); }
 
 /* ---------- categories ---------- */
-.cat-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(180px, 1fr)); gap: 12px; }
+.cat-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 12px; }
+@media (max-width: 520px) { .cat-grid { grid-template-columns: 1fr 1fr; gap: 10px; } .cat-tile { padding: 14px; } }
 .cat-tile { display: flex; flex-direction: column; gap: 2px; padding: 16px 18px; border-radius: var(--r-md); border: 1px solid var(--x-line-soft); background: linear-gradient(160deg, var(--x-panel), var(--x-navy-2)); text-decoration: none; color: var(--x-white); font-family: var(--font-display); font-weight: 600; }
 .cat-tile:hover { border-color: var(--x-blue); color: #fff; }
-.cat-tile small { font-family: var(--font-body); font-weight: 500; color: var(--x-muted); }
+.cat-tile small { font-family: var(--font-body); font-weight: 500; color: var(--x-muted); font-size: .84rem; line-height: 1.35; }
+.cat-tile .cat-count { margin-top: auto; padding-top: 8px; font: 600 .8rem var(--font-body); color: var(--x-blue-hi); }
 
 /* ---------- how it works ---------- */
 .how { display: grid; grid-template-columns: repeat(3, 1fr); gap: 0; border: 1px solid var(--x-line-soft); border-radius: var(--r-lg); overflow: hidden; }
@@ -352,6 +353,13 @@ input:focus, select:focus, textarea:focus { outline: none; border-color: var(--x
 .p-add { border: 1px dashed var(--x-line); border-radius: var(--r-md); background: transparent; color: var(--x-blue-hi); font: 600 1rem var(--font-display); cursor: pointer; min-height: 200px; }
 .p-add:hover { border-color: var(--x-blue); background: rgba(24,140,241,.06); }
 .p-err { color: var(--x-bad); font-size: .8rem; }
+/* Phones: two contenders per row so the form stays short */
+@media (max-width: 620px) {
+  .people-editor { grid-template-columns: 1fr 1fr; gap: 10px; }
+  .p-row { padding: 8px; }
+  .p-add { min-height: 0; aspect-ratio: 4/5; }
+  .p-remove { top: 12px; right: 12px; }
+}
 .when-custom, .when-private { display: none; }
 .show-custom .when-custom, .show-private .when-private { display: grid; }
 

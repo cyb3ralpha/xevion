@@ -60,7 +60,6 @@ $navCurrent = static fn(string $p) => ($path === $p || ($p !== '/' && str_starts
         <ul>
           <li><a href="<?= e(url('/create')) ?>">Start a match</a></li>
           <li><a href="<?= e(url('/explore')) ?>">Explore matches</a></li>
-          <li><a href="<?= e(url('/contact', ['topic' => 'advertising'])) ?>">Advertise with us</a></li>
         </ul>
       </div>
       <div>

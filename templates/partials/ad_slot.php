@@ -8,13 +8,12 @@ try {
 }
 if ($ad) {
     ad_record_impression($ad);
-} elseif ($placement !== 'top_banner' || setting('show_house_ad', '1') !== '1') {
-    return;
+} else {
+    return; // nothing is shown when no paid campaign is running
 }
 ?>
-<aside class="ad-slot <?= $placement === 'footer_banner' ? 'footer' : 'top' ?>" aria-label="<?= $ad ? 'Advertisement' : 'Advertising information' ?>">
+<aside class="ad-slot <?= $placement === 'footer_banner' ? 'footer' : 'top' ?>" aria-label="Advertisement">
   <div class="ad-inner">
-  <?php if ($ad): ?>
     <span class="ad-label">Advertisement</span>
     <a class="ad-creative" href="<?= e(ad_click_url($ad)) ?>" rel="sponsored noopener" target="_blank">
       <?php if ($ad['creative_type'] === 'image' && $ad['image_file']): ?>
@@ -31,8 +30,5 @@ if ($ad) {
       <?php endif; ?>
     </a>
     <span class="ad-advertiser">by <?= e($ad['advertiser']) ?></span>
-  <?php else: ?>
-    <span class="ad-house">This space is available for your brand. <a href="<?= e(url('/contact', ['topic' => 'advertising'])) ?>">Advertise on FaceMatch</a></span>
-  <?php endif; ?>
   </div>
 </aside>

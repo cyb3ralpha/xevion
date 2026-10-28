@@ -46,10 +46,14 @@
 
 <section class="section" id="categories">
   <div class="container">
-    <div class="section-head"><div><h2>Categories</h2><p>Every match picks one question for voters to answer.</p></div></div>
+    <div class="section-head"><div><h2>Categories</h2><p>Pick a question for voters. Tap one to see its matches or start your own.</p></div></div>
     <div class="cat-grid">
       <?php foreach (categories() as $key => $cat): if ($key === 'custom') { continue; } $n = $categoryCounts[$key] ?? 0; ?>
-        <a class="cat-tile" href="<?= e(url('/category/' . $key)) ?>"><?= e($cat['label']) ?><small><?= $n ? e(plural($n, 'match', 'matches')) : 'None yet' ?></small></a>
+        <a class="cat-tile" href="<?= e($n ? url('/category/' . $key) : url('/create', ['category' => $key])) ?>">
+          <?= e($cat['label']) ?>
+          <small><?= e($cat['prompt']) ?></small>
+          <span class="cat-count"><?= $n ? e(plural($n, 'match', 'matches')) : 'Start the first one →' ?></span>
+        </a>
       <?php endforeach; ?>
       <?php if (!empty($categoryCounts['custom'])): ?>
         <a class="cat-tile" href="<?= e(url('/category/custom')) ?>">Custom<small><?= e(plural($categoryCounts['custom'], 'match', 'matches')) ?></small></a>

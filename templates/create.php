@@ -55,16 +55,16 @@ $formClass = ($o['category'] === 'custom' ? 'show-custom ' : '') . ($o['visibili
 
     <section class="card pad">
       <div class="step-title"><span class="n">2</span><h2>Contenders</h2></div>
-      <p class="muted small">JPG, PNG or WebP, up to <?= (int)$maxMb ?> MB each, at least 160 × 160 pixels. Photos are re-processed on upload, which removes location and camera data.</p>
+      <p class="muted small">Tap a box to add a photo from your phone or computer. Any JPG, PNG or WebP works, and big photos are resized for you. Location and camera details are removed before anything is saved.</p>
       <?php if (!empty($errors['participants'])): ?><p class="field-error"><?= e($errors['participants']) ?></p><?php endif; ?>
       <div class="people-editor" data-people>
         <?php for ($i = 0; $i < $rows; $i++): ?>
           <div class="p-row<?= isset($pe[$i]) ? ' has-error' : '' ?>" data-row>
             <button type="button" class="p-remove" data-remove aria-label="Remove contender" hidden>×</button>
-            <label class="p-drop"><span data-drop-label>Add photo</span>
+            <label class="p-drop"><span data-drop-label>+ Add photo</span>
               <input type="file" name="photos[]" accept="image/jpeg,image/png,image/webp" aria-label="Photo for contender <?= $i + 1 ?>">
             </label>
-            <input name="names[]" maxlength="40" placeholder="Name or nickname" value="<?= e($o['names'][$i] ?? '') ?>" aria-label="Name of contender <?= $i + 1 ?>">
+            <input name="names[]" maxlength="40" placeholder="Name" value="<?= e($o['names'][$i] ?? '') ?>" aria-label="Name of contender <?= $i + 1 ?>">
             <?php foreach ($pe[$i] ?? [] as $m): ?><span class="p-err"><?= e($m) ?></span><?php endforeach; ?>
           </div>
         <?php endfor; ?>
@@ -74,8 +74,8 @@ $formClass = ($o['category'] === 'custom' ? 'show-custom ' : '') . ($o['visibili
       <template data-row-template>
         <div class="p-row" data-row>
           <button type="button" class="p-remove" data-remove aria-label="Remove contender">×</button>
-          <label class="p-drop"><span data-drop-label>Add photo</span><input type="file" name="photos[]" accept="image/jpeg,image/png,image/webp" aria-label="Photo"></label>
-          <input name="names[]" maxlength="40" placeholder="Name or nickname" aria-label="Name">
+          <label class="p-drop"><span data-drop-label>+ Add photo</span><input type="file" name="photos[]" accept="image/jpeg,image/png,image/webp" aria-label="Photo"></label>
+          <input name="names[]" maxlength="40" placeholder="Name" aria-label="Name">
         </div>
       </template>
     </section>

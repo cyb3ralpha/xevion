@@ -87,6 +87,10 @@ function page_create(): void
 {
     $errors = [];
     $old = [];
+    $pre = is_post() ? '' : str_input('category', 32);
+    if ($pre !== '' && isset(categories()[$pre])) {
+        $old['category'] = $pre; // from a category tile on the home page
+    }
     if (is_post()) {
         // post_max_size exceeded: PHP silently drops the whole body.
         if (empty($_POST) && (int)($_SERVER['CONTENT_LENGTH'] ?? 0) > 0) {

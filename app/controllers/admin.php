@@ -681,7 +681,6 @@ function settings_schema(): array
         'ip_pair_limit_per_day' => ['Votes on the same pair per network per day', 'int', 1, 1000],
         'report_escalate_threshold' => ['Open reports that hide a photo / delist a match', 'int', 1, 50],
         'ip_retention_days' => ['Keep IP-derived keys for (days)', 'int', 1, 365],
-        'show_house_ad' => ['Show “advertise with us” when no campaign is running', 'bool'],
         'blocked_terms' => ['Blocked words and phrases (one per line)', 'text'],
     ];
 }

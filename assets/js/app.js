@@ -176,9 +176,9 @@
         var old = $('img', drop); if (old) { URL.revokeObjectURL(old.src); old.remove(); }
         $$('.p-err', r).forEach(function (x) { x.remove(); }); r.classList.remove('has-error');
         var f = file.files && file.files[0];
-        if (!f) { label.textContent = 'Add photo'; return; }
+        if (!f) { label.textContent = '+ Add photo'; return; }
         var problem = checkFile(f);
-        if (problem) { file.value = ''; label.textContent = 'Add photo'; rowError(r, problem); return; }
+        if (problem) { file.value = ''; label.textContent = '+ Add photo'; rowError(r, problem); return; }
         var img = document.createElement('img'); img.alt = ''; img.src = URL.createObjectURL(f);
         drop.insertBefore(img, file); label.textContent = 'Change photo';
       });
