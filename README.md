@@ -17,7 +17,16 @@ Without Apache you can run the built-in server: `php -S localhost:8000 router.ph
 
 Production deployment, cron and hardening: **[docs/DEPLOYMENT.md](docs/DEPLOYMENT.md)**.
 
-Deploying on Vercel, which needs an external MySQL database and environment variables: **[docs/VERCEL.md](docs/VERCEL.md)**.
+## Deploy on Vercel
+
+[![Deploy with Vercel](https://vercel.com/button)](https://vercel.com/new/clone?repository-url=https%3A%2F%2Fgithub.com%2Fcyb3ralpha%2Fxevion&env=DATABASE_URL,ADMIN_EMAIL,ADMIN_PASSWORD&envDescription=A%20MySQL%20connection%20URL%20(mysql%3A%2F%2Fuser%3Apass%40host%3A3306%2Fdb)%20and%20the%20first%20admin%20login%20(password%2012%2B%20characters)&envLink=https%3A%2F%2Fgithub.com%2Fcyb3ralpha%2Fxevion%2Fblob%2Fmain%2Fdocs%2FVERCEL.md&project-name=xevion-facematch)
+
+You need a MySQL database that accepts internet connections, such as TiDB Cloud Serverless, Aiven or Railway. Vercel asks for three values:
+
+- `DATABASE_URL` is your database connection URL, `mysql://user:password@host:3306/dbname`.
+- `ADMIN_EMAIL` and `ADMIN_PASSWORD` create the first administrator. The password needs 12 or more characters.
+
+There is no install step. The first visit creates the tables and the admin account. Details and limits: **[docs/VERCEL.md](docs/VERCEL.md)**.
 
 ## What's inside
 
