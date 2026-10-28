@@ -50,6 +50,17 @@ If the variables are missing, the site shows **Database not connected** with the
 Without `ADMIN_EMAIL`/`ADMIN_PASSWORD` you can still create the administrator at `/install`, using a `SETUP_KEY` variable as the one-time key.
 
 Later deploys that add tables apply them automatically.
+
+## Troubleshooting
+
+**The site downloads a file named "download" instead of showing a page.** Production is pointing at a deployment built before Vercel support existed: commit `c1bd9a6` or earlier, which has no `vercel.json`. Vercel then serves `index.php` as a plain file. This usually happens after an **Instant Rollback** to an old deployment. A rollback also stops new pushes from going live automatically.
+
+To fix it, open **Deployments**, pick the newest Ready deployment from `main`, open its **⋯** menu and choose **Promote to Production**. Promoting also switches automatic production updates back on. Do not roll back to anything older than commit `2bb4a98`.
+
+**"Database not connected" page.** The database variables are missing. Add them as described in step 3, then redeploy.
+
+**"Cannot reach the database" page.** The variables are set but the connection fails. Check the host, port, name, user and password, and that the database accepts connections from the internet. The Vercel function logs show the MySQL error code.
+
 ## Limits to know
 
 - **Request size:** Vercel rejects requests over 4.5 MB. The create form resizes every photo in the browser and shrinks them further until the whole match fits. With JavaScript disabled, uploads larger than that fail.

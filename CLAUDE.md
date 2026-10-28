@@ -87,6 +87,8 @@ Headless Chrome will not lay out narrower than 512px with `--window-size`. For r
 
 9. **Oct 28: Home link.** Added a "Home" link with a house icon as the first item in the main navigation. It is highlighted on the home page.
 
+10. **Oct 28: rollback incident.** Production (www.xevion.pk, xevion-delta.vercel.app) had been rolled back to commit c1bd9a6, which has no vercel.json, so Vercel served index.php as a download. The rollback also disabled automatic production updates. Fix is in the Vercel dashboard: promote the newest deployment. Added a troubleshooting section to docs/VERCEL.md.
+
 ## Known limits and open items
 
 - The live Vercel deployment could not be inspected: the owner's Vercel project is not visible to the connected Vercel account.
