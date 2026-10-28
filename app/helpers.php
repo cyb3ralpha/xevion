@@ -298,6 +298,21 @@ function not_found(): never
     render_error(404);
 }
 
+/** Inline icon from templates/partials/icons.php (decorative: hidden from screen readers). */
+function icon(string $name, string $class = ''): string
+{
+    return '<svg class="icon' . ($class !== '' ? ' ' . e($class) : '') . '" aria-hidden="true" focusable="false"><use href="#i-' . e($name) . '"/></svg>';
+}
+
+/** Icon shown for each category. */
+function category_icon(string $key): string
+{
+    return [
+        'handsome' => 'crown', 'smile' => 'smile', 'smart' => 'bulb', 'funny' => 'laugh', 'stylish' => 'glasses',
+        'fashion' => 'shirt', 'photogenic' => 'camera', 'creative' => 'palette', 'team' => 'trophy', 'custom' => 'sparkle',
+    ][$key] ?? 'sparkle';
+}
+
 function categories(): array
 {
     return [

@@ -22,6 +22,7 @@ $navCurrent = static fn(string $p) => ($path === $p || ($p !== '/' && str_starts
 <script src="<?= e(asset('js/app.js')) ?>" defer></script>
 </head>
 <body class="<?= e($bodyClass ?? '') ?>">
+<?php partial('icons'); ?>
 <a class="skip" href="#main">Skip to content</a>
 <?php partial('ad_slot', ['placement' => 'top_banner']); ?>
 <header class="site-header">
@@ -35,7 +36,7 @@ $navCurrent = static fn(string $p) => ($path === $p || ($p !== '/' && str_starts
       <a href="<?= e(url('/explore')) ?>"<?= $navCurrent('/explore') ?>>Explore</a>
       <a href="<?= e(url('/') . '#categories') ?>">Categories</a>
       <a href="<?= e(url('/') . '#how') ?>">How it works</a>
-      <a class="btn btn-primary btn-sm" href="<?= e(url('/create')) ?>">Start a match</a>
+      <a class="btn btn-primary btn-sm" href="<?= e(url('/create')) ?>"><?= icon('plus') ?> Start a match</a>
     </div>
   </nav>
 </header>

@@ -2,7 +2,7 @@
 <section class="page-head">
   <div class="container">
     <h1><?= e($fixedCategory ? category_label(['category' => $fixedCategory]) : 'Explore matches') ?></h1>
-    <p><?= $fixedCategory ? e(categories()[$fixedCategory]['prompt']) . ' ' : '' ?>Public matches that passed review. Private matches never appear here.</p>
+    <p><?= $fixedCategory ? e(categories()[$fixedCategory]['prompt']) : 'Vote on public face-offs or find one to share.' ?></p>
   </div>
 </section>
 <div class="container">
@@ -10,16 +10,12 @@
     <a class="chip" href="<?= e(url('/explore', ['sort' => $f['sort'] !== 'recent' ? $f['sort'] : null, 'status' => $f['status'], 'q' => $f['q']])) ?>"<?= $f['category'] === '' ? ' aria-current="true"' : '' ?>>All</a>
     <?php foreach (categories() as $key => $cat): ?>
       <?php if ($key === 'custom' && empty($categoryCounts['custom'])) { continue; } ?>
-      <a class="chip" href="<?= e(url('/category/' . $key, ['sort' => $f['sort'] !== 'recent' ? $f['sort'] : null, 'status' => $f['status'], 'q' => $f['q']])) ?>"<?= $f['category'] === $key ? ' aria-current="true"' : '' ?>><?= e($cat['label']) ?> <span class="muted">(<?= (int)($categoryCounts[$key] ?? 0) ?>)</span></a>
+      <a class="chip" href="<?= e(url('/category/' . $key, ['sort' => $f['sort'] !== 'recent' ? $f['sort'] : null, 'status' => $f['status'], 'q' => $f['q']])) ?>"<?= $f['category'] === $key ? ' aria-current="true"' : '' ?>><?= icon(category_icon($key)) ?> <?= e($cat['label']) ?><?php if (!empty($categoryCounts[$key])): ?> <span class="chip-n"><?= (int)$categoryCounts[$key] ?></span><?php endif; ?></a>
     <?php endforeach; ?>
   </nav>
   <form class="filters" method="get" action="<?= e($fixedCategory ? url('/category/' . $fixedCategory) : url('/explore')) ?>" role="search">
-    <label class="field"><span>Search titles</span><input type="search" name="q" value="<?= e($f['q']) ?>" placeholder="e.g. best smile"></label>
-    <?php if (!$fixedCategory): ?>
-    <label class="field"><span>Category</span>
-      <select name="category"><option value="">All</option><?php foreach (categories() as $k => $cat): ?><option value="<?= e($k) ?>"<?= $f['category'] === $k ? ' selected' : '' ?>><?= e($cat['label']) ?></option><?php endforeach; ?></select>
-    </label>
-    <?php endif; ?>
+    <label class="field"><span>Search</span><input type="search" name="q" value="<?= e($f['q']) ?>" placeholder="e.g. best smile"></label>
+    <?php if (!$fixedCategory && $f['category'] !== ''): ?><input type="hidden" name="category" value="<?= e($f['category']) ?>"><?php endif; ?>
     <label class="field"><span>Status</span>
       <select name="status"><option value="">Any</option><option value="open"<?= $f['status'] === 'open' ? ' selected' : '' ?>>Open for voting</option><option value="closed"<?= $f['status'] === 'closed' ? ' selected' : '' ?>>Closed</option></select>
     </label>
