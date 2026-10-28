@@ -55,19 +55,12 @@ function session_cookie_options(array $o): array
 }
 
 /**
- * Sessions live in storage/sessions by default. On serverless hosts (session_driver = db)
- * they live in the `sessions` table, because each function instance has its own disk.
+ * Sessions are always stored in the `sessions` table: nothing is written to disk, and
+ * they work the same on every host (including serverless ones with temporary disks).
  */
 function use_session_storage(): void
 {
-    if (config('session_driver', 'files') === 'db') {
-        session_set_save_handler(new DbSessionHandler(), true);
-        return;
-    }
-    $sessDir = storage_path('sessions');
-    if (is_dir($sessDir) && is_writable($sessDir)) {
-        session_save_path($sessDir);
-    }
+    session_set_save_handler(new DbSessionHandler(), true);
 }
 
 final class DbSessionHandler implements SessionHandlerInterface, SessionUpdateTimestampHandlerInterface
@@ -294,9 +287,7 @@ function run_housekeeping(): array
     q('UPDATE reports SET reporter_ip_hash = NULL WHERE reporter_ip_hash IS NOT NULL AND created_at < DATE_SUB(UTC_TIMESTAMP(), INTERVAL ? DAY)', [$days]);
     q('UPDATE contact_messages SET ip_hash = NULL WHERE ip_hash IS NOT NULL AND created_at < DATE_SUB(UTC_TIMESTAMP(), INTERVAL ? DAY)', [$days]);
     q('UPDATE audit_log SET ip_hash = NULL WHERE ip_hash IS NOT NULL AND created_at < DATE_SUB(UTC_TIMESTAMP(), INTERVAL ? DAY)', [max($days, 90)]);
-    if (config('session_driver', 'files') === 'db') {
-        $out['sessions'] = q('DELETE FROM sessions WHERE expires_at < ?', [time()])->rowCount();
-    }
+    $out['sessions'] = q('DELETE FROM sessions WHERE expires_at < ?', [time()])->rowCount();
     $out['ads_archived'] =q("UPDATE ad_campaigns SET status = 'archived' WHERE status IN ('active','paused') AND ends_at < DATE_SUB(UTC_TIMESTAMP(), INTERVAL 30 DAY)")->rowCount();
     return $out;
 }

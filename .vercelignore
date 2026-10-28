@@ -1,10 +1,8 @@
-# Never upload local secrets or runtime data when deploying with the Vercel CLI.
-config/config.php
+# Local runtime data never goes to Vercel. config/config.php is deliberately NOT listed:
+# the site needs it (see docs/VERCEL.md).
 storage/installed.lock
-storage/setup-key.txt
 storage/media/*
 storage/logs/*
-storage/sessions/*
-tests/
 docs/
 router.php
+CLAUDE.md

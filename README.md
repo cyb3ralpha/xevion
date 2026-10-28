@@ -4,17 +4,15 @@ A photo face-off platform by XEVION. Visitors create a match from 2 to 20 photos
 
 Built with plain PHP 8.1+ and MySQL or MariaDB. It has no framework, no Node.js, no build step and no third-party services.
 
+## Configuration
+
+Everything the site needs, including the database connection and the first admin login, goes in one file: `config/config.php`. The file is git-ignored so passwords never reach GitHub. Its format is in **[docs/DEPLOYMENT.md](docs/DEPLOYMENT.md)**.
+
+Sessions are always stored in the database, so nothing about a visitor's session is written to disk.
+
 ## Deploy on Vercel
 
-[![Deploy with Vercel](https://vercel.com/button)](https://vercel.com/new/clone?repository-url=https%3A%2F%2Fgithub.com%2Fcyb3ralpha%2Fxevion&env=DATABASE_URL,ADMIN_EMAIL,ADMIN_PASSWORD&envDescription=A%20MySQL%20connection%20URL%20(mysql%3A%2F%2Fuser%3Apass%40host%3A3306%2Fdb)%20and%20the%20first%20admin%20login%20(password%2012%2B%20characters)&envLink=https%3A%2F%2Fgithub.com%2Fcyb3ralpha%2Fxevion%2Fblob%2Fmain%2Fdocs%2FVERCEL.md&project-name=xevion-facematch)
-
-You need a MySQL database that accepts connections from the internet, such as TiDB Cloud Serverless, Aiven or Railway. Vercel asks for three values:
-
-- `DATABASE_URL` is the connection URL, `mysql://user:password@host:3306/dbname`.
-- `ADMIN_EMAIL` and `ADMIN_PASSWORD` create the first administrator. The password needs 12 or more characters.
-
-There is no install step. The first visit creates the tables and the admin account. See **[docs/VERCEL.md](docs/VERCEL.md)** for details, limits and troubleshooting.
-
+You need a MySQL database that accepts connections from the internet, such as TiDB Cloud Serverless, Aiven or Railway. Create `config/config.php` with its details, then either make the repository private and commit the file, or deploy from your computer with the Vercel CLI. Step-by-step instructions, limits and troubleshooting are in **[docs/VERCEL.md](docs/VERCEL.md)**.
 ## Run on ordinary PHP hosting or locally
 
 1. Create an empty MySQL database (utf8mb4) and a user with full rights on it.
@@ -54,7 +52,7 @@ On XAMPP, enable `extension=gd` and `extension=sodium` in `C:\xampp\php\php.ini`
 | Guide | What it covers |
 |---|---|
 | [docs/DEPLOYMENT.md](docs/DEPLOYMENT.md) | Ordinary PHP hosting: configuration, permissions, HTTPS, cron, backups, Nginx |
-| [docs/VERCEL.md](docs/VERCEL.md) | Vercel: environment variables, limits, troubleshooting |
+| [docs/VERCEL.md](docs/VERCEL.md) | Vercel: database, getting the config file deployed, limits, troubleshooting |
 | [docs/ADMIN.md](docs/ADMIN.md) | Using the admin dashboard and roles |
 | [docs/SECURITY.md](docs/SECURITY.md) | Security model and privacy notes |
 | [docs/VOTING.md](docs/VOTING.md) | How pairing and ranking work |

@@ -15,7 +15,7 @@ If your host lets you choose the document root, the project root is the document
 
 ## 2. Permissions
 
-PHP must be able to write to `storage/` and its sub-folders `media/` and `logs/`. Typical: `chmod 750 storage storage/*`.
+PHP must be able to write to `storage/` and its sub-folders `media/` and `logs/`. Typical: `chmod 750 storage storage/*`. Sessions are stored in the database, not on disk.
 
 ## 3. Database
 
@@ -43,6 +43,7 @@ return [
         'name' => 'facematch',
         'user' => 'facematch',
         'pass' => 'database password',
+        'ssl'  => false,                           // true for hosted databases that require TLS
     ],
 ];
 ```

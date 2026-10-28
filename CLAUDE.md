@@ -17,8 +17,7 @@ XEVION FaceMatch is a photo face-off site. Visitors create a match from 2 to 20 
 | `index.php` | Public front controller and route table |
 | `admin/index.php` | Admin front controller |
 | `api/index.php` | Vercel entry point; dispatches to the two controllers above |
-| `app/bootstrap.php` | Loads config (file or environment), helpers, error handling, auto-setup |
-| `app/env_config.php` | Settings from environment variables (Vercel) |
+| `app/bootstrap.php` | Loads `config/config.php` plus platform defaults, helpers, error handling, auto-setup |
 | `app/auto_setup.php` | First-run setup on every host: tables, app secret, first admin |
 | `app/uploads.php` | Image validation, GD re-encoding or no-GD metadata stripping, file or DB storage |
 | `app/security.php` | Sessions (file or DB), CSRF, rate limits, abuse blocks, housekeeping |
@@ -49,9 +48,9 @@ php -S localhost:8090 api/index.php     # Vercel-style local run (see docs/VERCE
 ## Vercel deployment
 
 - `vercel.json` uses the community runtime `vercel-php@0.8.0` (PHP 8.4). Routes send `/assets/*` and `robots.txt` to static files and everything else to `api/index.php`, so source files are never served.
-- With no `config/config.php`, settings come from environment variables. Required: `DATABASE_URL` (or `DB_HOST`, `DB_PORT`, `DB_NAME`, `DB_USER`, `DB_PASSWORD`; provider names like `MYSQL_URL` and `MYSQLHOST` also work), `ADMIN_EMAIL`, `ADMIN_PASSWORD` (12+ characters). Optional: `APP_SECRET`, `CRON_SECRET`, `BASE_URL`, `DB_SSL`, `ADMIN_NAME`.
-- First request runs `auto_setup_boot()`: applies the schema, stores a generated app secret in `app_meta` when `APP_SECRET` is unset, and creates the super admin from the environment. Bump `SCHEMA_VERSION` in `app/auto_setup.php` whenever `database/schema.sql` changes.
-- On Vercel, sessions live in the `sessions` table and photos in `media_files`. Logs go to stderr.
+- All configuration, including the database, comes only from `config/config.php` (owner's decision, Oct 28). It is git-ignored; to deploy on Vercel the owner either makes the repo private and commits it, or deploys with the Vercel CLI (`.vercelignore` deliberately does not exclude it). The only environment variables read are Vercel's own `VERCEL` and `VERCEL_PROJECT_PRODUCTION_URL`, for platform defaults (`platform_defaults()` in `app/bootstrap.php`), plus `CRON_SECRET`, which Vercel Cron sends and must equal `cron_secret`.
+- First request runs `auto_setup_boot()`: applies the schema, stores a generated app secret in `app_meta` when `app_secret` is empty, and creates the super admin from `admin_email`/`admin_password`. Bump `SCHEMA_VERSION` in `app/auto_setup.php` whenever `database/schema.sql` changes.
+- Sessions always live in the `sessions` table on every host. On Vercel, photos go to `media_files` and logs to stderr automatically.
 - The Vercel PHP runtime has no GD or Imagick. The browser resizes photos to JPEG before upload, which also keeps requests under Vercel's 4.5 MB limit. PHP then strips EXIF, XMP, comments and PNG text chunks. Thumbnails reuse the full photo there.
 - Vercel Cron calls `/api/cron` daily with `Authorization: Bearer <CRON_SECRET>`; without the secret it returns 404.
 - Vercel cannot host MySQL; the owner must supply an external database (TiDB Cloud Serverless, Aiven, Railway, ...). Without one the site shows "Database not connected".
@@ -88,6 +87,8 @@ Headless Chrome will not lay out narrower than 512px with `--window-size`. For r
 10. **Oct 28: rollback incident.** Production (www.xevion.pk, xevion-delta.vercel.app) had been rolled back to commit c1bd9a6, which has no vercel.json, so Vercel served index.php as a download. The rollback also disabled automatic production updates. Fix is in the Vercel dashboard: promote the newest deployment. Added a troubleshooting section to docs/VERCEL.md.
 
 11. **Oct 28: clean structure.** The owner deleted `cli/`, `install/`, `tests/`, `config/config.sample.php` and `storage/sessions/`. To keep setup working everywhere, the automatic first-visit setup now runs on every host: ordinary hosting reads `admin_email` and `admin_password` from `config/config.php`, Vercel reads `ADMIN_EMAIL` and `ADMIN_PASSWORD`. Removed `app/installer.php`, the `/install` routes and `SETUP_KEY`; moved the unused original logo files to `docs/brand/`; removed the duplicate `docs/CLUADE.md`; rewrote the README with a structure overview and updated all guides. Maintenance on ordinary hosting is now a cron job calling `/api/cron`. There is no automated test suite any more; verify changes with HTTP smoke tests.
+
+12. **Oct 28: database sessions and config-file-only settings.** Sessions are now always stored in the database (no file sessions anywhere). Environment-variable configuration (`app/env_config.php`) was removed: the database and all settings come only from `config/config.php`. `docs/VERCEL.md` explains how to get that file onto Vercel safely; the README's env-var deploy button was removed.
 
 ## Known limits and open items
 
