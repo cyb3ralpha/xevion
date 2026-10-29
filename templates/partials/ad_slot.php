@@ -1,6 +1,9 @@
 <?php
 /** Advertising slot. Paid placements are always labelled. */
 $placement = $placement ?? 'top_banner';
+if (!db_enabled()) {
+    return; // campaigns live in the database
+}
 try {
     $ad = ad_pick($placement);
 } catch (Throwable $e) {

@@ -11,25 +11,10 @@ define('APP_VERSION', '1.0.0');
 date_default_timezone_set('UTC'); // all stored timestamps are UTC
 
 // All configuration, including the database connection, lives in config/config.php.
+// The file is optional: without it (as on Vercel) the site runs without a database,
+// as a showcase of the public pages (see db_enabled()).
 $configFile = APP_ROOT . '/config/config.php';
-if (!is_file($configFile)) {
-    if (PHP_SAPI === 'cli') {
-        fwrite(STDERR, "XEVION FaceMatch is not configured. Create config/config.php as described in docs/DEPLOYMENT.md.\n");
-        exit(1);
-    }
-    http_response_code(503);
-    header('Content-Type: text/html; charset=utf-8');
-    header('Cache-Control: no-store');
-    echo '<!doctype html><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>Configuration needed</title>'
-       . '<body style="font-family:system-ui;background:#0C0727;color:#fff;display:grid;place-items:center;min-height:100vh;margin:0;padding:16px">'
-       . '<div style="max-width:520px"><h1>Configuration needed</h1>'
-       . '<p>Create <code>config/config.php</code> (see <code>docs/DEPLOYMENT.md</code>) with the site address, '
-       . 'the MySQL database details and the first administrator&rsquo;s email and password.</p>'
-       . '<p style="opacity:.75">Tables and the admin account are created on the next visit.</p></div>';
-    exit;
-}
-
-$GLOBALS['APP_CONFIG'] = (require $configFile) + platform_defaults();
+$GLOBALS['APP_CONFIG'] = (is_file($configFile) ? (array)require $configFile : []) + platform_defaults();
 unset($configFile);
 
 /**
@@ -111,4 +96,6 @@ set_exception_handler(static function (Throwable $e): void {
 });
 
 // First use creates the tables and the first administrator (see app/auto_setup.php).
-auto_setup_boot();
+if (db_enabled()) {
+    auto_setup_boot();
+}

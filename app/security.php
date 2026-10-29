@@ -60,7 +60,10 @@ function session_cookie_options(array $o): array
  */
 function use_session_storage(): void
 {
-    session_set_save_handler(new DbSessionHandler(), true);
+    if (db_enabled()) {
+        session_set_save_handler(new DbSessionHandler(), true);
+    }
+    // Without a database PHP's default session storage is used; nothing important is kept in it.
 }
 
 final class DbSessionHandler implements SessionHandlerInterface, SessionUpdateTimestampHandlerInterface
@@ -294,7 +297,7 @@ function run_housekeeping(): array
 
 function maybe_housekeeping(): void
 {
-    if (random_int(1, 50) === 1) {
+    if (db_enabled() && random_int(1, 50) === 1) {
         try {
             run_housekeeping();
         } catch (Throwable $e) {

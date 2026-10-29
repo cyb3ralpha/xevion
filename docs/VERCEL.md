@@ -13,6 +13,16 @@ Vercel has no built-in PHP and no MySQL, and its servers have no permanent disk.
 | Image processing | GD re-encodes every photo | The browser resizes to JPEG; PHP validates and strips all metadata (GD is not available on Vercel) |
 | Maintenance | A cron job calls `/api/cron` | Vercel Cron calls `/api/cron` daily |
 
+## Preview mode: no database at all
+
+Deployed as-is, with no `config/config.php`, the site runs on Vercel **without a database**. Nothing needs to be set up:
+
+- The home page, Explore, categories, privacy and terms pages work normally. Listings are empty.
+- A slim banner says the site is in preview mode.
+- Creating matches, voting, reporting, the contact form and the admin dashboard show a friendly "coming soon" page instead, because they must save data and Vercel has no permanent disk.
+
+To switch on every feature later, connect a database as described below. The banner and the "coming soon" pages disappear automatically.
+
 ## 1. Create a MySQL database
 
 Vercel does not host MySQL. Use a MySQL 8 or MariaDB service that accepts connections from the internet, for example TiDB Cloud Serverless, Aiven for MySQL, Railway or your own server. Free hosting databases such as InfinityFree only accept connections from their own servers and will not work.

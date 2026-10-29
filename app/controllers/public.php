@@ -15,15 +15,16 @@ function require_not_blocked(): void
 
 function page_home(): void
 {
-    $featured = comp_listing(['featured' => true, 'sort' => 'activity'], 6);
-    $trending = comp_listing(['sort' => 'trending', 'status' => 'open'], 6);
-    $recent = comp_listing(['sort' => 'recent'], 6);
+    $db = db_enabled();
+    $featured = $db ? comp_listing(['featured' => true, 'sort' => 'activity'], 6) : [];
+    $trending = $db ? comp_listing(['sort' => 'trending', 'status' => 'open'], 6) : [];
+    $recent = $db ? comp_listing(['sort' => 'recent'], 6) : [];
     render('home', [
         'title' => 'FaceMatch — photo face-offs by XEVION',
         'featured' => $featured,
         'trending' => $trending,
         'recent' => $recent,
-        'categoryCounts' => category_counts(),
+        'categoryCounts' => $db ? category_counts() : [],
         'isEmpty' => !$featured && !$trending && !$recent,
         'bodyClass' => 'page-home',
     ]);
@@ -46,17 +47,18 @@ function page_explore(?string $category = null): void
     $f = explore_filters($category);
     $perPage = 12;
     $page = max(1, (int)input('page', 1));
-    $total = comp_listing_count($f);
+    $db = db_enabled();
+    $total = $db ? comp_listing_count($f) : 0;
     $pages = max(1, (int)ceil($total / $perPage));
     $page = min($page, $pages);
     render('explore', [
         'title' => $category ? category_label(['category' => $category]) . ' matches' : 'Explore matches',
         'filters' => $f,
-        'items' => comp_listing($f, $perPage, ($page - 1) * $perPage),
+        'items' => $db ? comp_listing($f, $perPage, ($page - 1) * $perPage) : [],
         'total' => $total,
         'page' => $page,
         'pages' => $pages,
-        'categoryCounts' => category_counts(),
+        'categoryCounts' => $db ? category_counts() : [],
         'fixedCategory' => $category,
     ]);
 }
@@ -763,6 +765,17 @@ function page_contact(): void
     }
     render('contact', ['title' => 'Contact', 'errors' => $errors, 'sent' => $sent, 'old' => $old, 'topics' => $topics,
         'contactEmail' => (string)setting('contact_email', '')]);
+}
+
+/** Shown for features that must store data when the site runs without a database. */
+function page_unavailable(string $feature): void
+{
+    if (is_api_request()) {
+        json_out(['ok' => false, 'error' => 'unavailable', 'message' => $feature . ' is not available on this site yet.'], 503);
+    }
+    http_response_code(503);
+    header('Retry-After: 86400');
+    render('unavailable', ['title' => $feature . ' is coming soon', 'feature' => $feature, 'noindex' => true]);
 }
 
 function page_privacy(): void

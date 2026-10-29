@@ -168,13 +168,26 @@ function uuid4(): string
     return vsprintf('%s%s-%s-%s-%s-%s%s%s', str_split(bin2hex($b), 4));
 }
 
+/**
+ * True when config/config.php names a database. Without one the site runs as a
+ * showcase: public pages work, and features that must store data say so politely.
+ */
+function db_enabled(): bool
+{
+    return trim((string)config('db.host', '')) !== '' && trim((string)config('db.name', '')) !== '';
+}
+
 function app_secret(): string
 {
     $s = (string)config('app_secret', '');
-    if (strlen($s) < 32) {
-        throw new RuntimeException('app_secret is missing or too short (config/config.php or the APP_SECRET environment variable)');
+    if (strlen($s) >= 32) {
+        return $s;
     }
-    return $s;
+    if (!db_enabled()) {
+        // Nothing is stored without a database, so a per-install derived key is enough.
+        return hash('sha256', 'xevion-showcase|' . APP_ROOT);
+    }
+    throw new RuntimeException('app_secret is missing or too short in config/config.php');
 }
 
 /** Keyed hash (HMAC-SHA256) — used for tokens at rest, IP-derived keys, voter ids. */

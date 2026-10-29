@@ -44,9 +44,22 @@ $routes = [
     '#^/terms$#'                              => 'page_terms',
 ];
 
+// Without a database only pages that store nothing run; the rest explain what is missing.
+$withoutDb = [
+    'page_home' => true, 'page_explore' => true, 'page_category' => true, 'page_privacy' => true, 'page_terms' => true,
+];
+$unavailable = [
+    'page_create' => 'Creating matches', 'page_created' => 'Creating matches', 'page_report' => 'Reporting',
+    'page_contact' => 'The contact form', 'api_next' => 'Voting', 'api_vote' => 'Voting',
+];
+
 foreach ($routes as $pattern => $handler) {
     if (preg_match($pattern, $path, $m)) {
         array_shift($m);
+        if (!db_enabled() && !isset($withoutDb[$handler])) {
+            isset($unavailable[$handler]) ? page_unavailable($unavailable[$handler]) : not_found();
+            exit;
+        }
         $handler(...$m);
         exit;
     }

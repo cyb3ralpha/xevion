@@ -12,7 +12,7 @@ Sessions are always stored in the database, so nothing about a visitor's session
 
 ## Deploy on Vercel
 
-You need a MySQL database that accepts connections from the internet, such as TiDB Cloud Serverless, Aiven or Railway. Create `config/config.php` with its details, then either make the repository private and commit the file, or deploy from your computer with the Vercel CLI. Step-by-step instructions, limits and troubleshooting are in **[docs/VERCEL.md](docs/VERCEL.md)**.
+Without any setup the site runs on Vercel in **preview mode**: the public pages work, and features that must save data (creating matches, voting, admin) show a "coming soon" page. You need a MySQL database that accepts connections from the internet, such as TiDB Cloud Serverless, Aiven or Railway. Create `config/config.php` with its details, then either make the repository private and commit the file, or deploy from your computer with the Vercel CLI. Step-by-step instructions, limits and troubleshooting are in **[docs/VERCEL.md](docs/VERCEL.md)**.
 ## Run on ordinary PHP hosting or locally
 
 1. Create an empty MySQL database (utf8mb4) and a user with full rights on it.

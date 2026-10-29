@@ -8,6 +8,14 @@ require dirname(__DIR__) . '/app/bootstrap.php';
 require APP_ROOT . '/app/admin_auth.php';
 require APP_ROOT . '/app/controllers/admin.php';
 
+if (!db_enabled()) {
+    // Admin accounts and everything they manage live in the database.
+    require APP_ROOT . '/app/controllers/public.php';
+    start_public_session();
+    send_security_headers(true);
+    page_unavailable('The admin dashboard');
+    exit;
+}
 ensure_first_admin(); // picks up an admin email/password added after the first visit
 admin_session_start();
 send_security_headers(true);

@@ -39,6 +39,9 @@ function settings_all(bool $refresh = false): array
     static $cache = null;
     if ($cache === null || $refresh) {
         $cache = setting_defaults();
+        if (!db_enabled()) {
+            return $cache;
+        }
         try {
             foreach (q_all('SELECT skey, svalue FROM settings') as $row) {
                 $cache[$row['skey']] = (string)$row['svalue'];
