@@ -31,19 +31,25 @@ What this mode cannot do, because there is nowhere shared to keep data:
 - Results are not tamper-proof: anyone can change data in their own browser, so per-device standings are for fun, not official results.
 - Once someone has opened a shared link, the organiser cannot revoke or delete their copy. A private link plus its code works for anyone they are passed on to.
 - Share links with many photos are long; some chat apps shorten or cut very long links.
-- There is no public listing of other people's matches, no moderation, no admin dashboard, no reports or contact form, and no ads. Those pages say they are not available.
+- Without Vercel Blob there is no public listing of other people's matches (see "Server storage" below). There is no moderation queue, no admin dashboard, no reports or contact form, and no ads. Those pages say they are not available.
 
-### Short share links
+### Server storage and short links (Vercel Blob)
 
-By default a share link carries the whole match, photos included, so it is very long. Connect **Vercel Blob** to get short links such as `https://www.xevion.pk/s/aB3dE5fG7h`:
+Without storage, matches live only in the creator's browser and a share link carries the whole match, so it is very long. Connect **Vercel Blob** to store matches on the server instead, with short links such as `https://www.xevion.pk/s/aB3dE5fG7h`:
 
 1. In Vercel open **Project → Storage → Create Database → Blob**, choose **Private** access, and create it.
 2. Connect it to this project (all environments). Vercel adds `BLOB_READ_WRITE_TOKEN` automatically.
 3. Redeploy.
 
-**Share** then stores the match in Blob through `api/share.js` (a small Node function that uses the official `@vercel/blob` library) and shows the short link. Short links get a proper preview card in chat apps, with the match title and question; private matches only show "Private match". Without Blob, or if storing fails, Share falls back to the long link, so sharing always works.
+With Blob connected, **Create match** uploads the match through `api/share.js` (a small Node function that uses the official `@vercel/blob` library) and opens its `/s/…` link:
 
-Blob is file storage, not a database. It holds one small text file per shared match. Blocking a short link (its ID in `BLOCKED_MATCHES`) is enforced by the server.
+- **Public** matches are listed for everyone on the home page ("Just created"), on Explore and on their category page, newest first.
+- **Private** matches are encrypted in the creator's browser with the access code before upload. They are never listed and open only through their link plus the code.
+- **Delete match** on the match page removes it from the server, but only in the browser that created it, which holds a secret delete key.
+- Short links get a preview card in chat apps with the match title and question; private ones only show "Private match".
+- If an upload fails, the match stays in the browser and Share tries again; Share falls back to the long link if storage is unavailable.
+
+Blob is file storage, not a database. Per match it holds the packed match (`s/{id}.txt`) and its delete-key hash (`k/{id}.json`); public matches also get a small listing entry with two cover photos (`i/…json`). Votes stay on each voter's device. Blocking a match (its short ID in `BLOCKED_MATCHES`) hides it from the lists and stops its link, enforced by the server. To remove a match completely, delete its three files in **Storage → Blob → Browser**.
 
 ### Admin dashboard without a database
 

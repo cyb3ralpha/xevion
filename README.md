@@ -10,7 +10,7 @@ Plain PHP 8.1+, no framework, no Composer or npm packages and no build step.
 |---|---|---|
 | Create, vote, results | In the visitor's browser | On the server |
 | Photos | Resized in the browser, kept in browser storage and inside share links. Never uploaded | Uploaded, re-encoded and stored in `media/uploads/` (or MySQL on Vercel) |
-| Sharing | Short `/s/…` links when Vercel Blob is connected, otherwise a link that carries the match; **private** matches are encrypted and need an access code | Public listing after review, or unguessable invite links with optional code |
+| Sharing | With Vercel Blob: matches are stored on the server, **public** ones are listed on the site and **private** ones (encrypted, need an access code) open only by their `/s/…` link. Without Blob: a link that carries the match | Public listing after review, or unguessable invite links with optional code |
 | Results | Per device, never combined across people | Combined for everyone, with duplicate-vote limits |
 | Admin dashboard | Status, moderation by share link (block list), matches in the admin's browser, backups | Full: matches, photos, reports, ads, administrators, settings |
 | Explore, reports, ads | Explore lists the device's own matches; reports go by email | Full |

@@ -744,11 +744,17 @@
     if (shortId) {
       if (blocked.indexOf(shortId.toLowerCase()) >= 0) { showFailure(new Error('blocked')); }
       else {
-        fetch(siteUrl('/api/share') + '?id=' + encodeURIComponent(shortId), { headers: { 'Accept': 'text/plain' } }).then(function (r) {
-          if (r.status === 410) throw new Error('blocked');
-          if (!r.ok) throw new Error('missing');
-          return r.text();
-        }).then(function (t) { start(t.trim()); }).catch(showFailure);
+        // A copy already in this browser (the creator's, or one unlocked before) opens directly,
+        // so the creator of a private match isn't asked for their own code.
+        lall().catch(function () { return []; }).then(function (items) {
+          var own = items.filter(function (x) { return x.shortId === shortId; })[0];
+          if (own) return showLoaded(own);
+          return fetch(siteUrl('/api/share') + '?id=' + encodeURIComponent(shortId), { headers: { 'Accept': 'text/plain' } }).then(function (r) {
+            if (r.status === 410) throw new Error('blocked');
+            if (!r.ok) throw new Error('missing');
+            return r.text();
+          }).then(function (t) { start(t.trim()); });
+        }).catch(showFailure);
       }
     } else {
       start(hash.get('s') || '');
