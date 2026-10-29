@@ -42,15 +42,57 @@
   <header class="lite-top">
     <a class="brand" href="<?= e(url('/admin/')) ?>"><img src="<?= e(brand_img('mark-dark-sm.png')) ?>" alt="" width="28" height="34"><span class="brand-product">FaceMatch<small>Admin</small></span></a>
     <nav class="lite-tabs" aria-label="Admin sections">
+      <a href="#server"><?= icon('image') ?> Matches</a>
       <a href="#status"><?= icon('chart') ?> Status</a>
       <a href="#moderation"><?= icon('shield') ?> Moderation</a>
-      <a href="#matches"><?= icon('image') ?> Matches in this browser</a>
+      <a href="#matches"><?= icon('lock') ?> This browser</a>
     </nav>
     <form method="post" action="<?= e(url('/admin/logout')) ?>"><input type="hidden" name="_csrf" value="<?= e($csrf) ?>"><button class="btn btn-ghost btn-sm" type="submit">Sign out</button></form>
   </header>
 
   <main class="container lite-main">
-    <div class="notice notice-info"><strong>This site runs without a database.</strong> Matches, photos and votes live in each visitor’s browser and inside share links, so there is no central list of matches to manage. What you can do here is below; everything else needs a database (see docs/VERCEL.md).</div>
+    <?php if ($notice !== ''): [$kind, $msg] = array_pad(explode(':', $notice, 2), 2, ''); ?>
+      <div class="notice notice-<?= $kind === 'ok' ? 'success' : 'error' ?>" role="status"><?= e($msg) ?></div>
+    <?php endif; ?>
+
+    <section class="card pad" id="server">
+      <h2><?= icon('image') ?> Matches on the server</h2>
+      <?php if ($server === null): ?>
+        <p class="muted">Storage isn’t connected, so matches only live in visitors’ browsers. In Vercel open <strong>Storage → Create Database → Blob</strong> (Private), connect it to this project and redeploy.</p>
+      <?php elseif (empty($server['ok'])): ?>
+        <div class="notice notice-error">The match list could not be loaded (<?= e((string)($server['error'] ?? 'error')) ?>). If you just changed the admin variables, redeploy so the site and the storage function use the same values.</div>
+      <?php else: ?>
+        <p class="muted small"><?= (int)$server['total'] ?> stored · <?= (int)$server['publicCount'] ?> public · <?= (int)$server['total'] - (int)$server['publicCount'] ?> private. Private matches are encrypted with their access code, so only their ID and votes are visible here. Deleting removes the match, its photos and its votes for everyone.</p>
+        <?php if (!$server['items']): ?><p class="muted">No matches yet.</p><?php else: ?>
+        <div class="table-scroll"><table class="tbl lite-matches">
+          <thead><tr><th>Match</th><th>Type</th><th class="num">Votes</th><th>Created</th><th></th></tr></thead>
+          <tbody>
+          <?php foreach ($server['items'] as $it): $id = (string)($it['id'] ?? ''); if (!preg_match('/^[A-Za-z0-9]{10}$/', $id)) { continue; } ?>
+            <tr>
+              <td><div class="lite-match">
+                <span class="lite-thumbs"><?php foreach (array_slice((array)($it['g'] ?? []), 0, 2) as $g): if (is_string($g) && preg_match('#^data:image/(jpeg|png|webp);base64,[A-Za-z0-9+/=]+$#', $g)): ?><img src="<?= e($g) ?>" alt="" width="36" height="45"><?php endif; endforeach; ?><?php if (empty($it['public'])): ?><span class="lite-lock"><?= icon('lock') ?></span><?php endif; ?></span>
+                <span><strong><?= e(!empty($it['public']) ? ((string)$it['t'] ?: 'Untitled') : 'Private match') ?></strong><br><a href="<?= e(url('/s/' . $id)) ?>" target="_blank" rel="noopener"><code><?= e($id) ?></code></a><?= !empty($it['blocked']) ? ' <span class="pill">Blocked</span>' : '' ?></span>
+              </div></td>
+              <td><?= !empty($it['public']) ? 'Public' : 'Private' ?><?= isset($it['n']) && $it['n'] ? '<br><span class="muted small">' . (int)$it['n'] . ' photos</span>' : '' ?></td>
+              <td class="num"><?= (int)$it['v'] ?><br><span class="muted small"><?= (int)$it['voters'] ?> voters</span></td>
+              <td><time datetime="<?= e(gmdate('c', (int)(($it['at'] ?? 0) / 1000))) ?>" data-local><?= e(gmdate('j M Y, H:i', (int)(($it['at'] ?? 0) / 1000))) ?> UTC</time></td>
+              <td><form method="post" action="<?= e(url('/admin/')) ?>" data-confirm="Delete this match, its photos and votes for everyone? This cannot be undone.">
+                <input type="hidden" name="_csrf" value="<?= e($csrf) ?>"><input type="hidden" name="op" value="delete"><input type="hidden" name="id" value="<?= e($id) ?>"><input type="hidden" name="page" value="<?= (int)$page ?>">
+                <button class="btn btn-ghost btn-sm danger" type="submit">Delete</button></form></td>
+            </tr>
+          <?php endforeach; ?>
+          </tbody>
+        </table></div>
+        <?php endif; ?>
+        <?php if ((int)$server['pages'] > 1): ?>
+          <nav class="btn-row" style="margin-top:14px" aria-label="Pages">
+            <?php if ($page > 1): ?><a class="btn btn-ghost btn-sm" href="<?= e(url('/admin/', ['page' => $page - 1])) ?>#server">Newer</a><?php endif; ?>
+            <span class="muted small">Page <?= (int)$page ?> of <?= (int)$server['pages'] ?></span>
+            <?php if ($page < (int)$server['pages']): ?><a class="btn btn-ghost btn-sm" href="<?= e(url('/admin/', ['page' => $page + 1])) ?>#server">Older</a><?php endif; ?>
+          </nav>
+        <?php endif; ?>
+      <?php endif; ?>
+    </section>
 
     <section class="card pad" id="status">
       <h2><?= icon('chart') ?> Status</h2>

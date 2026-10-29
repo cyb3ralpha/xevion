@@ -786,16 +786,18 @@
       start(hash.get('s') || '');
     }
     function catInfo() {
+      if (!m.category || m.category === 'open') return { label: '', prompt: m.instructions || 'Who wins? Tap your pick.' };
       var c = cats[m.category] || { l: 'Custom', p: 'Pick a winner' };
       return { label: m.category === 'custom' && m.custom ? m.custom : c.l, prompt: m.instructions || c.p };
     }
     function pairKey(a, b) { return a < b ? a + '|' + b : b + '|' + a; }
 
     /* Shared voting: matches stored on the server count every browser's votes together. */
-    var pending = [], flushTimer = 0, sending = false, global = null, serverOff = false, view = 'all';
+    var pending = [], flushTimer = 0, sending = false, global = null, serverOff = false, netLimited = false, view = 'all';
     function online() { return !!(m && m.shortId && shortEnabled && !serverOff); }
     function pos(p) { return +String(p.id).slice(1); }
     function queueVote(w, l) {
+      if (netLimited) return;
       pending.push([w, l]);
       clearTimeout(flushTimer);
       flushTimer = setTimeout(flushVotes, pending.length >= 5 ? 0 : 1200);
@@ -812,6 +814,16 @@
         });
       }).then(function (r) {
         if (r.status === 404 || r.status === 403 || r.status === 410) { serverOff = true; return null; }   // not countable online
+        if (r.status === 429) {
+          return r.json().catch(function () { return {}; }).then(function (j) {
+            if (j.error !== 'network_limit') throw new Error('rate limited');
+            netLimited = true; pending = [];
+            var st = q('[data-lp-status]');
+            st.textContent = 'Votes from your internet connection already reached the limit for this match, so these votes weren’t counted.';
+            st.className = 'arena-status err';
+            return null;
+          });
+        }
         if (!r.ok) throw new Error('vote ' + r.status);
         return r.json();
       }).then(function (j) {
@@ -840,6 +852,8 @@
       document.title = m.title + ' | XEVION FaceMatch';
       q('[data-lp-title]').textContent = m.title;
       q('[data-lp-id]').textContent = online() ? m.shortId : m.id;
+      q('[data-lp-reset-wrap]').hidden = online();   // online votes are final: one per matchup
+      q('[data-lp-cat]').hidden = !ci.label;
       q('[data-lp-cat]').textContent = ci.label;
       q('[data-lp-prompt]').textContent = ci.prompt;
     }
@@ -897,6 +911,10 @@
         ? 'Vote counted. ' + Math.round((pr[win.id] || 0) * 100 / both) + '% of votes on this device agree.'
         : 'Vote counted.';
       q('[data-lp-status]').className = 'arena-status ok';
+      if (online() && netLimited) {
+        q('[data-lp-status]').textContent = 'Saved on this device only: your internet connection reached the vote limit for this match.';
+        q('[data-lp-status]').className = 'arena-status err';
+      }
       if (online()) queueVote(pos(win), pos(lose));
       lput(m).then(function () {
         var grid = q('[data-lp-grid]');
@@ -1034,7 +1052,7 @@
     var body = el('div', 'match-body');
     body.appendChild(el('h3', null, o.title));
     var meta = el('div', 'match-meta');
-    meta.appendChild(el('span', 'pill pill-cat', o.cat));
+    if (o.cat) meta.appendChild(el('span', 'pill pill-cat', o.cat));
     if (o.tag) meta.appendChild(el('span', 'pill', o.tag));
     var meta2 = el('div', 'match-meta');
     meta2.appendChild(el('span', null, o.count + ' contenders'));
@@ -1043,7 +1061,7 @@
     a.appendChild(duo); a.appendChild(body);
     return a;
   }
-  function catLabel(labels, c, cc) { return c === 'custom' && cc ? cc : (labels[c] || 'Custom'); }
+  function catLabel(labels, c, cc) { return !c || c === 'open' ? '' : c === 'custom' && cc ? cc : (labels[c] || 'Custom'); }
   function ago(ts) {
     var s = Math.max(0, (Date.now() - ts) / 1000);
     if (s < 3600) return Math.max(1, Math.round(s / 60)) + ' min ago';
@@ -1097,7 +1115,11 @@
       items = items.filter(function (m) {
         return (!cat || m.category === cat) && blockedList.indexOf(m.id) < 0 && !(m.shortId && onSite.indexOf(m.shortId) >= 0);
       }).sort(function (a, b) { return b.created - a.created; });
-      if (!items.length) { $('[data-local-empty]').hidden = false; return; }
+      if (!items.length) {
+        var sec = $('[data-local-section]');
+        if (sec) sec.hidden = true; else $('[data-local-empty]').hidden = false;   // nothing extra on this device
+        return;
+      }
       items.forEach(function (m) {
         var votes = Object.keys(m.wins || {}).reduce(function (s, k) { return s + m.wins[k]; }, 0);
         listRoot.appendChild(matchCard({

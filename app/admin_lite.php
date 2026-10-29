@@ -2,9 +2,10 @@
 /**
  * Admin dashboard when the site runs without a database.
  *
- * There is no stored data to manage on the server, so this dashboard is honest about
- * scope: deployment status, inspecting and blocking shared matches, and managing the
- * matches saved in the admin's own browser.
+ * With Vercel Blob connected it lists every match stored on the server (public and
+ * private) with its votes and can delete any of them, through signed calls to api/share.js.
+ * It also shows deployment status, inspects shared links, and manages the matches saved
+ * in the admin's own browser.
  *
  * Sign-in: ADMIN_EMAIL plus ADMIN_PASSWORD_HASH (bcrypt, preferred) or ADMIN_PASSWORD,
  * set as Vercel environment variables. Sessions are a signed, expiring cookie because
@@ -96,9 +97,11 @@ function lite_post_ok(): bool
     $origin = (string)($_SERVER['HTTP_ORIGIN'] ?? '');
     if ($origin !== '') {
         // Compare host and port: "Origin: http://localhost:8181" must match "Host: localhost:8181".
+        // Behind a trusted proxy the public host may arrive as X-Forwarded-Host (request_origin()).
         $o = parse_url($origin);
         $authority = strtolower(($o['host'] ?? '') . (isset($o['port']) ? ':' . $o['port'] : ''));
-        if ($authority === '' || $authority !== strtolower((string)($_SERVER['HTTP_HOST'] ?? ''))) {
+        $own = [strtolower((string)($_SERVER['HTTP_HOST'] ?? '')), strtolower((string)preg_replace('#^https?://#', '', request_origin()))];
+        if ($authority === '' || !in_array($authority, $own, true)) {
             return false;
         }
     }
@@ -121,6 +124,35 @@ function lite_password_ok(string $password): bool
         }
     }
     return $ok;
+}
+
+/**
+ * Call the storage function (api/share.js) as the admin. The request is signed with
+ * HMAC(lite_key, "share-admin|" + time), which the function checks with the same key.
+ * Returns the decoded JSON, or ['ok' => false, 'error' => …].
+ */
+function lite_share_api(array $body): array
+{
+    if (env_value('BLOB_READ_WRITE_TOKEN') === '' || !function_exists('curl_init') || ($origin = request_origin()) === '') {
+        return ['ok' => false, 'error' => 'storage_off'];
+    }
+    $ts = (string)time();
+    $ch = curl_init($origin . '/api/share');
+    curl_setopt_array($ch, [
+        CURLOPT_POST => true,
+        CURLOPT_POSTFIELDS => json_encode(['action' => 'admin'] + $body),
+        CURLOPT_HTTPHEADER => ['Content-Type: application/json', 'Accept: application/json', 'X-Admin-Ts: ' . $ts,
+            'X-Admin-Sig: ' . hash_hmac('sha256', 'share-admin|' . $ts, lite_key())],
+        CURLOPT_RETURNTRANSFER => true, CURLOPT_TIMEOUT => 20, CURLOPT_CONNECTTIMEOUT => 4,
+    ]);
+    $raw = curl_exec($ch);
+    $code = (int)curl_getinfo($ch, CURLINFO_RESPONSE_CODE);
+    curl_close($ch);
+    $j = is_string($raw) ? json_decode($raw, true) : null;
+    if (!is_array($j)) {
+        return ['ok' => false, 'error' => 'unreachable (HTTP ' . $code . ')'];
+    }
+    return $j;
 }
 
 function lite_render(string $view, array $vars = []): void
@@ -173,8 +205,26 @@ function admin_lite(string $route): void
     if (!$admin) {
         redirect('/admin/login');
     }
+    $notice = '';
+    if (is_post()) {
+        if (!lite_post_ok()) {
+            $notice = 'error:Your session expired. Reload the page and try again.';
+        } elseif (($_POST['op'] ?? '') === 'delete' && preg_match('/^[A-Za-z0-9]{10}$/', (string)($_POST['id'] ?? ''))) {
+            $r = lite_share_api(['op' => 'delete', 'id' => (string)$_POST['id']]);
+            $notice = !empty($r['ok']) ? 'ok:Match ' . $_POST['id'] . ' was deleted with its photos and votes.' : 'error:Could not delete the match (' . ($r['error'] ?? 'error') . ').';
+        }
+        // Post/redirect/get, so a reload doesn't repeat the action.
+        setcookie('fm_adm_note', $notice, lite_cookie_opts(0));
+        redirect('/admin/' . (isset($_POST['page']) ? '?page=' . max(1, (int)$_POST['page']) : '') . '#server');
+    }
+    if (isset($_COOKIE['fm_adm_note'])) {
+        $notice = (string)$_COOKIE['fm_adm_note'];
+        setcookie('fm_adm_note', '', lite_cookie_opts(time() - 3600));
+    }
+    $page = max(1, (int)($_GET['page'] ?? 1));
+    $server = env_value('BLOB_READ_WRITE_TOKEN') !== '' ? lite_share_api(['op' => 'list', 'page' => $page]) : null;
     $status = [
-        'Storage' => 'None on the server — matches live in visitors’ browsers',
+        'Storage' => env_value('BLOB_READ_WRITE_TOKEN') !== '' ? 'Vercel Blob (matches, photos and votes are stored on the server)' : 'Not connected: matches only live in visitors’ browsers. Connect Vercel Blob (see docs/VERCEL.md).',
         'Environment' => env_value('VERCEL_ENV', PHP_SAPI === 'cli-server' ? 'local (built-in server)' : 'local'),
         'Deployed commit' => ($sha = env_value('VERCEL_GIT_COMMIT_SHA')) !== '' ? substr($sha, 0, 7) . ' — ' . env_value('VERCEL_GIT_COMMIT_MESSAGE', '') : 'not on Vercel',
         'Region' => env_value('VERCEL_REGION', '—'),
@@ -185,5 +235,6 @@ function admin_lite(string $route): void
         'Blocked matches' => (string)count(blocked_matches()),
         'Signing key' => strlen(env_value('APP_SECRET')) >= 32 ? 'APP_SECRET' : 'Derived from the admin password (set APP_SECRET to keep sessions across password changes)',
     ];
-    lite_render('dashboard', ['admin' => $admin, 'status' => $status, 'blocked' => blocked_matches(), 'csrf' => lite_csrf_token()]);
+    lite_render('dashboard', ['admin' => $admin, 'status' => $status, 'blocked' => blocked_matches(), 'csrf' => lite_csrf_token(),
+        'server' => $server, 'page' => $page, 'notice' => $notice]);
 }

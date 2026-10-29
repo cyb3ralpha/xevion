@@ -66,7 +66,12 @@ Every batch of votes is one read and one write in Blob. Check **Usage** in Verce
 | `CONTACT_EMAIL` | Optional; shown on the Contact and Report pages |
 | `BLOCKED_MATCHES` | Optional; comma-separated match IDs that must no longer open on the site |
 
-The dashboard offers **Status** (this deployment's details), **Moderation** (paste a reported share link to see its content and ID; block it by adding the ID to `BLOCKED_MATCHES`) and **Matches in this browser** (list, delete, back up to a file, restore). It cannot see or delete matches on other people's devices.
+The sign-in is fixed by these variables: only that email and password open the dashboard. They live in Vercel, not in the code, because the repository is public. The dashboard offers:
+
+- **Matches** (with Blob connected): every match stored on the server, public and private, newest first, with its votes and voters. **Delete** removes a match, its photos and its votes for everyone. The dashboard reaches the storage function with a request signed by a key derived from the admin variables (or `APP_SECRET`), so nobody else can list or delete. After changing the admin variables, redeploy so both sides use the new values.
+- **Status** (this deployment's details), **Moderation** (paste a reported share link to see its content and ID; block it by adding the ID to `BLOCKED_MATCHES`) and **This browser** (matches saved in the admin's own browser: delete, back up to a file, restore).
+
+**Why not the `media/` folder?** Vercel's file system is read-only while the site runs, and every deployment starts from the repository again, so files written to `media/` would vanish. Vercel Blob is Vercel's own file storage on the server; it is where matches, photos and votes are kept. `media/brand/` holds the site's images and `media/uploads/` is used only with a MySQL database on ordinary hosting.
 
 To get shared results, accounts for admins and everything else, connect a MySQL database as described below. The site switches to the full version automatically.
 ## 1. Create a MySQL database

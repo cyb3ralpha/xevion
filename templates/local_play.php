@@ -97,7 +97,7 @@ foreach ($categoryLabels as $k => $label) {
 
     <div class="arena-foot">
       <span>Tap a photo to vote.<span class="kbd-hint"> Keyboard: <span class="kbd">1</span> / <span class="kbd">←</span> left, <span class="kbd">2</span> / <span class="kbd">→</span> right.</span></span>
-      <span><span class="muted">Match ID <code data-lp-id></code></span> · <a href="<?= e(url('/report')) ?>">Report</a> · <button class="link-btn" type="button" data-lp-reset>Reset votes</button> · <button class="link-btn danger" type="button" data-lp-delete>Delete match</button></span>
+      <span><span class="muted">Match ID <code data-lp-id></code></span> · <a href="<?= e(url('/report')) ?>">Report</a><span data-lp-reset-wrap> · <button class="link-btn" type="button" data-lp-reset>Reset votes</button></span> ·<button class="link-btn danger" type="button" data-lp-delete>Delete match</button></span>
     </div>
   </div>
 </div>

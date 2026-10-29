@@ -7,13 +7,15 @@
  *   GET  /api/share?list=1[&category=smile][&page=2]        -> {"items": [...], "more": bool}
  *   POST /api/share  {"action": "vote", "id", "voter", "votes": [[winner, loser], ...], "vt"?}
  *   GET  /api/share?tally=aB3dE5fG7h                        -> {"n", "w": [...], "g": [...], "v", "voters"}
+ *   POST /api/share  {"action": "admin", "op": "list"|"delete", ...}  signed by the PHP admin (X-Admin-Sig)
  *
  * Blob layout:
  *   s/{id}.txt                      the packed match (public: deflated JSON; private: AES-GCM ciphertext)
  *   k/{id}.json                     {"h": sha256(delete key), "i": index pathname or ""}
  *   i/{newest-first}-{id}-{cat}.json  public matches only: title, category, count and two cover photos
  *   t/{id}.json                     shared vote tally: wins and matchups per contender (by position),
- *                                   hashed voter/pair keys so one browser counts once per pair, and for
+ *                                   hashed voter/pair keys so one browser counts once per pair, salted
+ *                                   network hashes (at most 3 voting browsers per connection), and for
  *                                   private matches the hash of the vote token derived from the access code
  *
  * Public matches are listed on the site. Private ones are encrypted in the browser with the
@@ -39,6 +41,23 @@ const PAGE_SIZE = 24;
 const VOTER_RE = /^[A-Za-z0-9_-]{16,64}$/;
 const VT_RE = /^[a-f0-9]{64}$/;
 const MAX_SEEN = 100000;                        // voter/pair keys kept per match (about 1.1 MB)
+const NET_LIMIT = 3;                            // browsers per internet connection that may vote on one match
+
+function clientIp(req) {
+  return String(req.headers['x-real-ip'] || String(req.headers['x-forwarded-for'] || '').split(',')[0]).trim() || 'unknown';
+}
+/** The voter's network: the IPv4 address, or the /64 prefix for IPv6 (one household usually shares it). */
+function network(req) {
+  const ip = clientIp(req);
+  return ip.includes(':') ? ip.split(':').slice(0, 4).join(':') : ip;
+}
+function netSalt() { return envValue('APP_SECRET') || envValue('BLOB_READ_WRITE_TOKEN'); }
+/** Environment value with surrounding quotes removed, like env_value() in app/helpers.php. */
+function envValue(k) {
+  let v = String(process.env[k] || '').trim();
+  if (v.length >= 2 && (v[0] === '"' || v[0] === "'") && v[v.length - 1] === v[0]) v = v.slice(1, -1).trim();
+  return v;
+}
 
 // Best-effort per-instance limit; use Vercel Firewall rate limiting for a hard limit.
 const recent = new Map();
@@ -188,6 +207,7 @@ async function handleVote(req, res) {
   }
   if (blocked().includes(id.toLowerCase())) return res.status(410).json({ ok: false, error: 'blocked' });
   const voterHash = sha256(`${id}|${voter}`).slice(0, 8);
+  const netHash = sha256(`${netSalt()}|${id}|${network(req)}`).slice(0, 8);   // the IP itself is never stored
   for (let attempt = 0; attempt < 8; attempt++) {
     const cur = await loadTally(id);
     if (!cur) return res.status(404).json({ ok: false, error: 'not_found' });
@@ -196,6 +216,10 @@ async function handleVote(req, res) {
       const vt = String(b.vt || ''), a = Buffer.from(t.vh), c = Buffer.from(VT_RE.test(vt) ? sha256(vt) : '');
       if (a.length !== c.length || !crypto.timingSafeEqual(a, c)) return res.status(403).json({ ok: false, error: 'code_required' });
     }
+    // A new browser may join only while its internet connection has fewer than NET_LIMIT voters on this match.
+    t.ip = t.ip && typeof t.ip === 'object' ? t.ip : {};
+    const isNew = !hasVoter(t.vs, voterHash);
+    if (isNew && (t.ip[netHash] || 0) >= NET_LIMIT) return res.status(429).json({ ok: false, error: 'network_limit' });
     let added = 0;
     for (const pair of b.votes) {
       if (!Array.isArray(pair) || pair.length !== 2) continue;
@@ -206,7 +230,7 @@ async function handleVote(req, res) {
       t.s += key; t.w[w]++; t.g[w]++; t.g[l]++; t.v++; added++;
     }
     if (!added) return res.status(200).json(Object.assign(publicTally(t), { added: 0 }));
-    if (!hasVoter(t.vs, voterHash)) t.vs += voterHash;
+    if (isNew) { t.vs += voterHash; t.ip[netHash] = (t.ip[netHash] || 0) + 1; }
     try {
       const body = JSON.stringify(t);
       if (cur.etag) {
@@ -221,6 +245,78 @@ async function handleVote(req, res) {
     }
   }
   return res.status(503).json({ ok: false, error: 'busy' });
+}
+
+/* ---------- admin (called server-to-server by the PHP admin dashboard) ---------- */
+
+/** Same key as lite_key() in app/admin_lite.php; null when no admin sign-in is configured. */
+function adminKey() {
+  const email = envValue('ADMIN_EMAIL'), hash = envValue('ADMIN_PASSWORD_HASH'), pw = envValue('ADMIN_PASSWORD'), secret = envValue('APP_SECRET');
+  if (!/^[^@\s]+@[^@\s]+$/.test(email) || (!hash && pw.length < 12)) return null;
+  return crypto.createHash('sha256').update(secret.length >= 32 ? `lite-admin|${secret}` : `lite-admin|${email}|${hash}|${pw}`).digest();
+}
+
+/** Requests carry X-Admin-Ts and X-Admin-Sig = HMAC-SHA256(key, "share-admin|" + ts), valid for 5 minutes. */
+function adminOk(req) {
+  const key = adminKey(), ts = String(req.headers['x-admin-ts'] || ''), sig = String(req.headers['x-admin-sig'] || '');
+  if (!key || !/^\d{10}$/.test(ts) || Math.abs(Date.now() / 1000 - Number(ts)) > 300 || !/^[a-f0-9]{64}$/.test(sig)) return false;
+  const want = Buffer.from(crypto.createHmac('sha256', key).update(`share-admin|${ts}`).digest('hex'));
+  return crypto.timingSafeEqual(want, Buffer.from(sig));
+}
+
+async function listAll(prefix) {
+  const out = [];
+  let cursor;
+  do {
+    const r = await list({ prefix, limit: 1000, cursor });
+    out.push(...r.blobs);
+    cursor = r.hasMore ? r.cursor : undefined;
+  } while (cursor && out.length < 20000);
+  return out;
+}
+
+/** Every file that belongs to a match, as blob URLs. */
+async function matchFiles(id) {
+  const urls = [];
+  for (const p of [`s/${id}.txt`, `k/${id}.json`, `t/${id}.json`]) {
+    const r = await list({ prefix: p, limit: 1 });
+    for (const blob of r.blobs) if (blob.pathname === p) urls.push(blob.url);
+  }
+  for (const blob of await listAll('i/')) if (blob.pathname.includes(`-${id}-`)) urls.push(blob.url);
+  return urls;
+}
+
+async function handleAdmin(req, res) {
+  if (!adminOk(req)) return res.status(403).json({ ok: false, error: 'admin_only' });
+  res.setHeader('Cache-Control', 'no-store');
+  const op = String(req.body.op || '');
+  if (op === 'list') {
+    const page = Math.max(1, Math.min(500, parseInt(req.body.page, 10) || 1)), per = 30;
+    const [stored, index] = await Promise.all([listAll('s/'), listAll('i/')]);
+    const listed = {};
+    for (const b of index) { const m = /^i\/\d{13}-([A-Za-z0-9]{10})-/.exec(b.pathname); if (m) listed[m[1]] = b.pathname; }
+    const all = stored.map((b) => ({ id: b.pathname.slice(2, -4), at: new Date(b.uploadedAt).getTime(), size: b.size }))
+      .filter((x) => ID_RE.test(x.id)).sort((a, b) => b.at - a.at);
+    const block = blocked();
+    const items = await Promise.all(all.slice((page - 1) * per, page * per).map(async (x) => {
+      let entry = null, tally = null;
+      if (listed[x.id]) { try { entry = JSON.parse(await readBlob(listed[x.id])); } catch (e) { entry = null; } }
+      try { const t = JSON.parse(await readBlob(`t/${x.id}.json`)); tally = { v: t.v, voters: t.vs.length / 8 }; } catch (e) { tally = null; }
+      return { id: x.id, at: x.at, size: x.size, public: !!listed[x.id], blocked: block.includes(x.id.toLowerCase()),
+        t: entry ? entry.t : '', n: entry ? entry.n : null, g: entry ? (entry.g || []).slice(0, 2) : [],
+        v: tally ? tally.v : 0, voters: tally ? tally.voters : 0 };
+    }));
+    return res.status(200).json({ ok: true, total: all.length, publicCount: Object.keys(listed).length, page, pages: Math.max(1, Math.ceil(all.length / per)), items });
+  }
+  if (op === 'delete') {
+    const id = String(req.body.id || '');
+    if (!ID_RE.test(id)) return res.status(400).json({ ok: false, error: 'bad_id' });
+    const urls = await matchFiles(id);
+    if (!urls.length) return res.status(404).json({ ok: false, error: 'not_found' });
+    await del(urls);
+    return res.status(200).json({ ok: true, removed: urls.length });
+  }
+  return res.status(400).json({ ok: false, error: 'bad_op' });
 }
 
 async function handleCreate(req, res, payload) {
@@ -305,6 +401,7 @@ module.exports = async (req, res) => {
     }
 
     if (req.method === 'POST') {
+      if (req.body && typeof req.body === 'object' && req.body.action === 'admin') return await handleAdmin(req, res);
       if (!sameOrigin(req)) return res.status(403).json({ ok: false, error: 'origin' });
       const ip = String(req.headers['x-forwarded-for'] || '').split(',')[0].trim() || 'unknown';
       if (!req.body || typeof req.body !== 'object') return res.status(400).json({ ok: false, error: 'bad_request' });

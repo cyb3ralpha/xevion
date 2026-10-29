@@ -72,3 +72,9 @@ a.stat:hover { border-color: var(--x-blue); }
 .lite-faces figcaption { font-size: .85rem; margin-top: 4px; }
 .lite-list { padding-left: 18px; }
 @media (max-width: 640px) { .lite-top { gap: 10px; } .lite-tabs a { padding: 6px 8px; font-size: .85rem; } }
+.lite-match { display: flex; align-items: center; gap: 12px; }
+.lite-thumbs { position: relative; display: inline-flex; gap: 3px; flex: none; min-width: 36px; }
+.lite-thumbs img { width: 36px; height: 45px; object-fit: cover; border-radius: 6px; background: var(--x-panel-2); }
+.lite-lock { display: inline-grid; place-items: center; width: 36px; height: 45px; border-radius: 6px; background: var(--x-panel-2); color: var(--x-muted); }
+.lite-matches td { vertical-align: middle; }
+.btn.danger { color: var(--x-bad); border-color: rgba(255,92,122,.4); }

@@ -12,10 +12,10 @@ $lists = [
     <div class="hero-copy">
       <h1>Put them side by side. <span class="grad-text">Let the crowd pick.</span></h1>
       <p class="ticker" aria-hidden="true"><?= icon('bolt') ?><span class="ticker-q" data-ticker="<?= e(implode('|', $prompts)) ?>"><?= e($prompts[0]) ?></span></p>
-      <p class="hero-lede">Add photos of your friends, pick a question, share the link and watch head-to-head votes roll in.</p>
+      <p class="hero-lede"><?= db_enabled() ? 'Add photos of your friends, pick a question, share the link and watch head-to-head votes roll in.' : 'Add a few photos, share the link, and everyone votes two at a time. No sign-up, live results.' ?></p>
       <div class="btn-row">
         <a class="btn btn-primary btn-lg btn-shine" href="<?= e(url('/create')) ?>">Start a match <?= icon('arrow') ?></a>
-        <a class="btn btn-ghost btn-lg" href="<?= e(url('/explore')) ?>"><?= icon('search') ?> Explore</a>
+        <a class="btn btn-ghost btn-lg" href="<?= e(url('/explore')) ?>"><?= icon('search') ?> <?= db_enabled() ? 'Explore' : 'See matches' ?></a>
       </div>
       <ul class="trust">
         <li><?= icon('shield') ?> No sign-up</li>
@@ -28,13 +28,18 @@ $lists = [
 </section>
 
 <?php if (!empty($serverStore)): ?>
-<section class="section" data-public-list data-limit="6" data-hide-empty data-labels="<?= e(json_encode(array_map(static fn($c) => $c['label'], categories()), JSON_UNESCAPED_UNICODE)) ?>">
+<section class="section" data-public-list data-limit="9" data-labels="<?= e(json_encode(array_map(static fn($c) => $c['label'], categories()), JSON_UNESCAPED_UNICODE)) ?>">
   <div class="container">
     <div class="section-head">
-      <div><h2><span class="h-icon"><?= icon('clock') ?></span>Just created</h2><p>The newest public matches.</p></div>
-      <a class="more-link" href="<?= e(url('/explore')) ?>">Browse everything <?= icon('arrow') ?></a>
+      <div><h2><span class="h-icon"><?= icon('fire') ?></span>Latest matches</h2><p>Open one and vote. Everyone’s votes add up to one live leaderboard.</p></div>
+      <a class="more-link" href="<?= e(url('/explore')) ?>">See all matches <?= icon('arrow') ?></a>
     </div>
     <div class="match-grid" data-public-grid></div>
+    <div class="empty" data-public-empty hidden>
+      <h2>No public matches yet</h2>
+      <p>Create the first one. It takes about a minute.</p>
+      <a class="btn btn-primary" href="<?= e(url('/create')) ?>"><?= icon('plus') ?> Create a match</a>
+    </div>
   </div>
 </section>
 <?php endif; ?>
@@ -53,6 +58,7 @@ $lists = [
   <?php endif; ?>
 <?php endforeach; ?>
 
+<?php if (db_enabled()): ?>
 <section class="section" id="categories">
   <div class="container">
     <div class="section-head" data-reveal><div><h2>Pick a question</h2><p>Every match asks voters one thing. Tap a category to see its matches or start one.</p></div></div>
@@ -68,14 +74,15 @@ $lists = [
     </div>
   </div>
 </section>
+<?php endif; ?>
 
 <section class="section" id="how">
   <div class="container">
     <div class="section-head" data-reveal><div><h2>How it works</h2><p>Three steps, about a minute.</p></div></div>
     <ol class="how">
       <li data-reveal style="--d:0"><span class="how-icon"><?= icon('image') ?></span><h3>Add the contenders</h3><p>A photo and a nickname for each person or team, from 2 up to <?= e(setting_int('max_participants', 20)) ?>. Only add people who agreed to take part.</p></li>
-      <li data-reveal style="--d:1"><span class="how-icon"><?= icon('link') ?></span><h3>Share the link</h3><p><?= db_enabled() ? 'Public matches appear in Explore after a quick review. Private matches open only through your invite link.' : 'Send the link to friends. Choose a private match and it only opens with the access code you give them.' ?></p></li>
-      <li data-reveal style="--d:2"><span class="how-icon"><?= icon('bolt') ?></span><h3>Vote head-to-head</h3><p>Voters see two photos at a time and tap a pick. Rankings come from each contender’s win rate across all matchups.</p></li>
+      <li data-reveal style="--d:1"><span class="how-icon"><?= icon('link') ?></span><h3>Share the link</h3><p><?= db_enabled() ? 'Public matches appear in Explore after a quick review. Private matches open only through your invite link.' : (!empty($serverStore) ? 'Public matches appear on the site for everyone. Private ones open only with their link and the access code you send.' : 'Send the link to friends. Choose a private match and it only opens with the access code you give them.') ?></p></li>
+      <li data-reveal style="--d:2"><span class="how-icon"><?= icon('bolt') ?></span><h3>Vote head-to-head</h3><p>Voters see two photos at a time and tap a pick<?= !empty($serverStore) ? ', once per pair' : '' ?>. Rankings come from each contender’s win rate across all matchups.</p></li>
     </ol>
   </div>
 </section>

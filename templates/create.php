@@ -11,7 +11,7 @@ $local = !empty($local); // no database: the match is saved in this browser
   <div class="container narrow">
     <h1>Start a match</h1>
     <?php if ($local): ?>
-    <p>Add <?= $minP ?>–<?= $maxP ?> contenders and choose what voters should judge. Your match is saved in this browser, and you get a link to share it with friends.</p>
+    <p><?= !empty($serverStore) ? 'Give it a title, add ' . $minP . '–' . $maxP . ' photos, and get a link to share. Public matches appear on the site for everyone to vote on.' : 'Add ' . $minP . '–' . $maxP . ' contenders and choose what voters should judge. Your match is saved in this browser, and you get a link to share it with friends.' ?></p>
     <?php else: ?>
     <p>Add <?= $minP ?>–<?= $maxP ?> contenders, choose what voters should judge, and decide who can see it. You will get a share link and a private link to manage the match.</p>
     <?php endif; ?>
@@ -36,6 +36,14 @@ $local = !empty($local); // no database: the match is saved in this browser
           <input name="title" maxlength="120" required value="<?= e($o['title']) ?>" placeholder="Who has the best smile in our class of 2016?">
           <?php partial('field_error', ['errors' => $errors, 'name' => 'title']); ?>
         </label>
+        <?php if ($local): ?>
+        <input type="hidden" name="category" value="open" data-category>
+        <input type="hidden" name="custom_category" value="">
+        <input type="hidden" name="description" value="">
+        <label class="field"><span>Question for voters <span class="hint">Optional, shown above every face-off</span></span>
+          <input name="instructions" maxlength="300" value="<?= e($o['instructions']) ?>" placeholder="Who has the best smile?">
+        </label>
+        <?php else: ?>
         <label class="field<?= $err('category') ?>"><span>Category</span>
           <select name="category" required data-category>
             <option value="">Choose a category</option>
@@ -55,6 +63,7 @@ $local = !empty($local); // no database: the match is saved in this browser
           <input name="instructions" maxlength="300" value="<?= e($o['instructions']) ?>" placeholder="Judge the outfit, not the background">
           <?php partial('field_error', ['errors' => $errors, 'name' => 'instructions']); ?>
         </label>
+        <?php endif; ?>
       </div>
     </section>
 
