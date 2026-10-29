@@ -73,11 +73,24 @@ function abs_url(string $path = '/', array $query = []): string
 }
 
 /** URL of a static brand image in media/brand/ (cache-busted like asset()). */
+/**
+ * Cache-busting version for a static file, taken from its contents. Modification times
+ * can't be used: on Vercel every deployed file has the same timestamp, so browsers kept
+ * month-old copies of app.js after fixes were deployed.
+ */
+function file_version(string $path): string
+{
+    static $cache = [];
+    if (!isset($cache[$path])) {
+        $hash = is_file($path) ? md5_file($path) : false;
+        $cache[$path] = $hash ? substr($hash, 0, 10) : APP_VERSION;
+    }
+    return $cache[$path];
+}
+
 function brand_img(string $file): string
 {
-    $path = APP_ROOT . '/media/brand/' . $file;
-    $v = is_file($path) ? substr((string)filemtime($path), -6) : APP_VERSION;
-    return url('/media/brand/' . $file) . '?v=' . $v;
+    return url('/media/brand/' . $file) . '?v=' . file_version(APP_ROOT . '/media/brand/' . $file);
 }
 
 /** Folder for photos uploaded on ordinary hosting (git-ignored, never web-accessible). */
@@ -89,9 +102,7 @@ function uploads_path(string $sub = ''): string
 
 function asset(string $path): string
 {
-    $file = APP_ROOT . '/assets/' . ltrim($path, '/');
-    $v = is_file($file) ? substr((string)filemtime($file), -6) : APP_VERSION;
-    return url('/assets/' . ltrim($path, '/')) . '?v=' . $v;
+    return url('/assets/' . ltrim($path, '/')) . '?v=' . file_version(APP_ROOT . '/assets/' . ltrim($path, '/'));
 }
 
 function redirect(string $to, int $code = 303): never

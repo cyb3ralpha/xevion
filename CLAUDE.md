@@ -101,6 +101,8 @@ Headless Chrome will not lay out narrower than 512px with `--window-size`. For r
 
 17. **Oct 29: fixes after owner testing.** Photos with an empty MIME type (some phones and apps) were rejected before the byte check ran; now only a wrong non-empty type is refused and the file signature decides. iPhone HEIC files get a specific message. Admin sign-in now tolerates a plain password placed in `ADMIN_PASSWORD_HASH` and quoted env values, and the error explains what must match (and that Vercel needs a redeploy after changes).
 
+18. **Oct 29: stale browser cache.** On Vercel every deployed file has mtime 0, so `asset()` produced `?v=000000` forever and browsers kept a 30-day-cached old `app.js`; the owner's browser still ran pre-fix code, which posted the create form to the server, where it silently reloaded. Static URLs are now versioned by content (`file_version()`, MD5 prefix). A create POST without a database now shows "outdated version" guidance and keeps the typed fields instead of redirecting.
+
 ## Known limits and open items
 
 - The live Vercel deployment could not be inspected: the owner's Vercel project is not visible to the connected Vercel account.

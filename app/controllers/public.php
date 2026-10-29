@@ -94,9 +94,13 @@ function page_create(): void
         $old['category'] = $pre; // from a category tile on the home page
     }
     if (!db_enabled() && is_post()) {
-        redirect('/create'); // matches are created in the browser in this mode
+        // Matches are created in the browser in this mode. A form that reaches the server
+        // means the browser ran an outdated or blocked script, so say so instead of reloading silently.
+        $errors['form'] = 'Your match wasn’t saved because this page loaded an outdated version of the site. Reload the page (or clear this site’s cache), choose the photos again and press Create match.';
+        $old = ['title' => str_input('title', 120), 'category' => str_input('category', 32), 'description' => str_input('description', 600),
+                'instructions' => str_input('instructions', 300), 'custom_category' => str_input('custom_category', 40)];
     }
-    if (is_post()) {
+    if (db_enabled() && is_post()) {
         // post_max_size exceeded: PHP silently drops the whole body.
         if (empty($_POST) && (int)($_SERVER['CONTENT_LENGTH'] ?? 0) > 0) {
             $errors['form'] = 'The upload was too large in total. Use smaller photos or fewer participants.';
