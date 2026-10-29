@@ -272,6 +272,19 @@
       }
       err.hidden = true;
       var btn = $('[data-submit]', form); btn.classList.add('is-busy');
+      if (form.hasAttribute('data-local')) {
+        // No database: build the match in this browser and open it.
+        e.preventDefault();
+        btn.disabled = true; btn.textContent = 'Creating your match…';
+        localCreateFromForm(form, rows()).then(function (id) {
+          location.href = siteUrl('/play') + '#id=' + encodeURIComponent(id);
+        }).catch(function (ex) {
+          btn.disabled = false; btn.classList.remove('is-busy'); btn.textContent = 'Create match';
+          err.textContent = 'The match could not be saved in this browser (' + (ex && ex.message ? ex.message : 'storage error') + '). Private browsing can block saving; try a normal window.';
+          err.hidden = false;
+        });
+        return;
+      }
       $('[data-submit-note]', form).textContent = 'This can take a moment on slow connections.';
       if (!canShrink || form._shrunk) { btn.textContent = 'Uploading photos…'; return; }
       // Resize every photo first; the whole request must stay under ~4 MB.
@@ -410,5 +423,350 @@
       body.innerHTML = ''; body.appendChild(box);
       h.setAttribute('tabindex', '-1'); h.focus();
     }
+  }
+
+  /* =====================================================================
+     Device mode (the site runs without a database).
+     Matches are kept in this browser's IndexedDB. A share link carries the
+     whole match (with small photos) in the URL fragment, which is never sent
+     to the server. Every visitor's votes are counted on their own device.
+     All user text is inserted with textContent; images must be data:image/.
+     ===================================================================== */
+  function siteUrl(path) {
+    var home = $('.brand');
+    return (home ? home.getAttribute('href') : '/').replace(/\/$/, '') + path;
+  }
+  function el(tag, cls, text) {
+    var n = document.createElement(tag);
+    if (cls) n.className = cls;
+    if (text != null) n.textContent = text;
+    return n;
+  }
+  function safeImg(src) { return typeof src === 'string' && /^data:image\/(jpeg|png|webp);base64,[A-Za-z0-9+\/=]+$/.test(src) ? src : ''; }
+  function clip(s, n) { return String(s == null ? '' : s).replace(/[\u0000-\u001f]/g, ' ').trim().slice(0, n); }
+
+  /* ---------- storage ---------- */
+  var LDB = 'xevion-facematch', LSTORE = 'matches';
+  function ldbOpen() {
+    return new Promise(function (resolve, reject) {
+      if (!window.indexedDB) { reject(new Error('this browser cannot store matches')); return; }
+      var r = indexedDB.open(LDB, 1);
+      r.onupgradeneeded = function () { r.result.createObjectStore(LSTORE, { keyPath: 'id' }); };
+      r.onsuccess = function () { resolve(r.result); };
+      r.onerror = function () { reject(r.error || new Error('storage unavailable')); };
+    });
+  }
+  function ldb(mode, fn) {
+    return ldbOpen().then(function (db) {
+      return new Promise(function (resolve, reject) {
+        var tx = db.transaction(LSTORE, mode), req = fn(tx.objectStore(LSTORE)), out;
+        if (req) req.onsuccess = function () { out = req.result; };
+        tx.oncomplete = function () { db.close(); resolve(out); };
+        tx.onerror = tx.onabort = function () { db.close(); reject(tx.error || new Error('storage error')); };
+      });
+    });
+  }
+  function lget(id) { return ldb('readonly', function (st) { return st.get(id); }); }
+  function lput(m) { return ldb('readwrite', function (st) { return st.put(m); }); }
+  function ldel(id) { return ldb('readwrite', function (st) { return st.delete(id); }); }
+  function lall() { return ldb('readonly', function (st) { return st.getAll(); }).then(function (a) { return a || []; }); }
+  function newId() {
+    var b = new Uint8Array(9); crypto.getRandomValues(b);
+    return Array.prototype.map.call(b, function (x) { return ('0' + x.toString(16)).slice(-2); }).join('');
+  }
+
+  /* ---------- images ---------- */
+  function drawJpeg(src, maxW, maxH, quality) {
+    var w = src.naturalWidth || src.width, h = src.naturalHeight || src.height, s = Math.min(1, maxW / w, maxH / h);
+    var c = document.createElement('canvas');
+    c.width = Math.max(1, Math.round(w * s)); c.height = Math.max(1, Math.round(h * s));
+    var ctx = c.getContext('2d');
+    ctx.fillStyle = '#0C0727'; ctx.fillRect(0, 0, c.width, c.height);
+    ctx.drawImage(src, 0, 0, c.width, c.height);
+    if (src.close) src.close();
+    return c.toDataURL('image/jpeg', quality);
+  }
+  function fileToJpeg(file, maxW, maxH, quality) {
+    return decodeImage(file).then(function (src) { return drawJpeg(src, maxW, maxH, quality); });
+  }
+  function dataUrlToJpeg(dataUrl, maxW, maxH, quality) {
+    return new Promise(function (resolve, reject) {
+      var img = new Image();
+      img.onload = function () { resolve(drawJpeg(img, maxW, maxH, quality)); };
+      img.onerror = function () { reject(new Error('image')); };
+      img.src = dataUrl;
+    });
+  }
+
+  /* ---------- create ---------- */
+  function localCreateFromForm(form, rowEls) {
+    var people = rowEls.map(function (r) {
+      return { name: clip($('input[name="names[]"]', r).value, 40), file: $('input[type=file]', r).files[0] };
+    });
+    return Promise.all(people.map(function (p) { return fileToJpeg(p.file, 900, 1125, 0.82); })).then(function (imgs) {
+      var m = {
+        id: newId(), v: 1, created: Date.now(),
+        title: clip(form.title.value, 120), category: form.category.value,
+        custom: form.category.value === 'custom' ? clip(form.custom_category.value, 40) : '',
+        description: clip(form.description.value, 600), instructions: clip(form.instructions.value, 300),
+        people: people.map(function (p, i) { return { id: 'p' + i, name: p.name, img: imgs[i] }; }),
+        wins: {}, losses: {}, pairs: {}, round: 1, seen: {}, mine: true
+      };
+      return lput(m).then(function () { return m.id; });
+    });
+  }
+
+  /* ---------- share links ---------- */
+  function b64urlFromBytes(bytes) {
+    var s = '', chunk = 0x8000;
+    for (var i = 0; i < bytes.length; i += chunk) s += String.fromCharCode.apply(null, bytes.subarray(i, i + chunk));
+    return btoa(s).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
+  }
+  function bytesFromB64url(s) {
+    s = s.replace(/-/g, '+').replace(/_/g, '/'); while (s.length % 4) s += '=';
+    var bin = atob(s), out = new Uint8Array(bin.length);
+    for (var i = 0; i < bin.length; i++) out[i] = bin.charCodeAt(i);
+    return out;
+  }
+  function packText(text) {
+    var bytes = new TextEncoder().encode(text);
+    if (!window.CompressionStream) return Promise.resolve('u' + b64urlFromBytes(bytes));
+    return new Response(new Blob([bytes]).stream().pipeThrough(new CompressionStream('deflate-raw'))).arrayBuffer()
+      .then(function (buf) { return 'z' + b64urlFromBytes(new Uint8Array(buf)); });
+  }
+  function unpackText(s) {
+    var bytes = bytesFromB64url(s.slice(1));
+    if (s.charAt(0) === 'u') return Promise.resolve(new TextDecoder().decode(bytes));
+    if (s.charAt(0) !== 'z' || !window.DecompressionStream) return Promise.reject(new Error('unsupported link'));
+    return new Response(new Blob([bytes]).stream().pipeThrough(new DecompressionStream('deflate-raw'))).text();
+  }
+  function shareUrlFor(m) {
+    return Promise.all(m.people.map(function (p) { return dataUrlToJpeg(p.img, 240, 300, 0.6); })).then(function (imgs) {
+      var payload = { v: 1, t: m.title, c: m.category, cc: m.custom || '', d: m.description || '', i: m.instructions || '',
+        p: m.people.map(function (p, i) { return { n: p.name, g: imgs[i] }; }) };
+      return packText(JSON.stringify(payload));
+    }).then(function (packed) { return location.origin + siteUrl('/play') + '#s=' + packed; });
+  }
+  function digestId(text) {
+    if (!(window.crypto && crypto.subtle)) return Promise.resolve('sh' + newId());
+    return crypto.subtle.digest('SHA-256', new TextEncoder().encode(text)).then(function (buf) {
+      return 'sh' + Array.prototype.map.call(new Uint8Array(buf).slice(0, 9), function (x) { return ('0' + x.toString(16)).slice(-2); }).join('');
+    });
+  }
+  /** Validate a shared match and keep it in this browser (once per link). */
+  function importShared(packed) {
+    var text;
+    return unpackText(packed).then(function (t) {
+      text = t;
+      var d = JSON.parse(t);
+      if (!d || d.v !== 1 || !Array.isArray(d.p) || d.p.length < 2 || d.p.length > 20) throw new Error('invalid');
+      var people = d.p.map(function (p, i) { return { id: 'p' + i, name: clip(p && p.n, 40) || 'Contender ' + (i + 1), img: safeImg(p && p.g) }; });
+      if (people.some(function (p) { return !p.img; })) throw new Error('invalid');
+      return digestId(text).then(function (id) {
+        return lget(id).then(function (existing) {
+          if (existing) return id;
+          return lput({ id: id, v: 1, created: Date.now(), title: clip(d.t, 120) || 'Shared match', category: clip(d.c, 32),
+            custom: clip(d.cc, 40), description: clip(d.d, 600), instructions: clip(d.i, 300), people: people,
+            wins: {}, losses: {}, pairs: {}, round: 1, seen: {}, mine: false }).then(function () { return id; });
+        });
+      });
+    });
+  }
+
+  /* ---------- play page ---------- */
+  var lp = $('[data-local-play]');
+  if (lp) initLocalPlay(lp);
+
+  function initLocalPlay(root) {
+    var cats = {}; try { cats = JSON.parse(root.dataset.cats || '{}'); } catch (e) {}
+    var q = function (s) { return $(s, root); }, m = null, current = null, busy = false, last = '';
+    var hash = new URLSearchParams(location.hash.slice(1));
+
+    var load = hash.get('s') ? importShared(hash.get('s')).then(function (id) {
+      history.replaceState(null, '', location.pathname + '#id=' + encodeURIComponent(id));
+      return lget(id);
+    }) : (hash.get('id') ? lget(hash.get('id')) : Promise.resolve(null));
+
+    load.then(function (match) {
+      q('[data-lp-loading]').hidden = true;
+      if (!match) { q('[data-lp-missing]').hidden = false; return; }
+      m = match; q('[data-lp-main]').hidden = false; renderHeader(); showArena();
+    }).catch(function () {
+      q('[data-lp-loading]').hidden = true; q('[data-lp-missing]').hidden = false;
+    });
+
+    function catInfo() {
+      var c = cats[m.category] || { l: 'Custom', p: 'Pick a winner' };
+      return { label: m.category === 'custom' && m.custom ? m.custom : c.l, prompt: m.instructions || c.p };
+    }
+    function pairKey(a, b) { return a < b ? a + '|' + b : b + '|' + a; }
+    function allPairs() {
+      var out = [];
+      for (var i = 0; i < m.people.length; i++) for (var j = i + 1; j < m.people.length; j++) out.push([m.people[i], m.people[j]]);
+      return out;
+    }
+    function renderHeader() {
+      var ci = catInfo();
+      document.title = m.title + ' | XEVION FaceMatch';
+      q('[data-lp-title]').textContent = m.title;
+      q('[data-lp-cat]').textContent = ci.label;
+      q('[data-lp-prompt]').textContent = ci.prompt;
+    }
+    function progress() {
+      var total = allPairs().length, done = Object.keys(m.seen).length;
+      q('[data-lp-progress]').style.width = (total ? Math.round(done * 100 / total) : 0) + '%';
+      q('[data-lp-round]').textContent = 'Voter ' + m.round + ' · ' + done + ' of ' + total + ' matchups';
+    }
+    function showArena() {
+      q('[data-lp-results]').hidden = true;
+      var left = allPairs().filter(function (p) { return !m.seen[pairKey(p[0].id, p[1].id)]; });
+      progress();
+      if (!left.length) { q('[data-lp-arena]').hidden = true; q('[data-lp-done]').hidden = false; return; }
+      q('[data-lp-done]').hidden = true; q('[data-lp-arena]').hidden = false;
+      // Prefer a pair that shares nobody with the previous one, so faces don't repeat back to back.
+      var fresh = left.filter(function (p) { return last.indexOf(p[0].id + ',') < 0 && last.indexOf(p[1].id + ',') < 0; });
+      var pool = fresh.length ? fresh : left, pick = pool[Math.floor(Math.random() * pool.length)];
+      current = Math.random() < 0.5 ? pick : [pick[1], pick[0]];
+      last = current[0].id + ',' + current[1].id + ',';
+      $$('.contender', root).forEach(function (btn, i) {
+        var p = current[i];
+        btn.classList.remove('is-picked', 'is-other');
+        btn.removeAttribute('aria-disabled');
+        $('img', btn).src = safeImg(p.img);
+        $('[data-lp-name]', btn).textContent = p.name;
+        btn.setAttribute('aria-label', 'Vote for ' + p.name);
+      });
+      q('[data-lp-status]').textContent = '';
+      busy = false;
+    }
+    function vote(side) {
+      if (busy || !current) return;
+      busy = true;
+      var win = current[side], lose = current[1 - side], k = pairKey(win.id, lose.id);
+      m.wins[win.id] = (m.wins[win.id] || 0) + 1;
+      m.losses[lose.id] = (m.losses[lose.id] || 0) + 1;
+      var pr = m.pairs[k] || {}; pr[win.id] = (pr[win.id] || 0) + 1; m.pairs[k] = pr;
+      m.seen[k] = true;
+      $$('.contender', root).forEach(function (btn, i) {
+        btn.classList.toggle('is-picked', i === side); btn.classList.toggle('is-other', i !== side);
+        btn.setAttribute('aria-disabled', 'true');
+      });
+      var both = (pr[win.id] || 0) + (pr[lose.id] || 0);
+      q('[data-lp-status]').textContent = both > 1
+        ? 'Vote counted. ' + Math.round((pr[win.id] || 0) * 100 / both) + '% of votes on this device agree.'
+        : 'Vote counted.';
+      q('[data-lp-status]').className = 'arena-status ok';
+      lput(m).then(function () {
+        var grid = q('[data-lp-grid]');
+        setTimeout(function () {
+          if (!reduceMotion) grid.classList.add('is-swapping');
+          setTimeout(function () { showArena(); grid.classList.remove('is-swapping'); }, reduceMotion ? 0 : 320);
+        }, 650);
+      }).catch(function () { q('[data-lp-status]').textContent = 'Could not save the vote in this browser.'; busy = false; });
+    }
+    function renderResults() {
+      var rows = m.people.map(function (p) {
+        var w = m.wins[p.id] || 0, l = m.losses[p.id] || 0;
+        return { p: p, w: w, l: l, rate: w + l ? w / (w + l) : -1 };
+      }).sort(function (a, b) { return b.rate - a.rate || b.w - a.w; });
+      var tbody = q('[data-lp-rows]'), total = 0;
+      tbody.textContent = '';
+      rows.forEach(function (r, i) {
+        total += r.w;
+        var prev = rows[i - 1], same = prev && prev.rate === r.rate && prev.w === r.w;
+        r.rank = same ? prev.rank : i + 1;
+        var tied = same || (rows[i + 1] && rows[i + 1].rate === r.rate && rows[i + 1].w === r.w);
+        var tr = el('tr');
+        tr.appendChild(el('td', 'rank', String(r.rank)));
+        var who = el('td'), wrap = el('div', 'who'), img = el('img');
+        img.src = safeImg(r.p.img); img.alt = ''; img.width = 44; img.height = 55;
+        wrap.appendChild(img); wrap.appendChild(el('span', null, r.p.name));
+        if (tied && r.w + r.l > 0) wrap.appendChild(el('span', 'tie', 'Tied'));
+        who.appendChild(wrap); tr.appendChild(who);
+        var rate = el('td', 'num', r.rate < 0 ? '—' : Math.round(r.rate * 100) + '%');
+        var bar = el('div', 'bar'), fill = el('i'); fill.style.width = (r.rate < 0 ? 0 : Math.round(r.rate * 100)) + '%';
+        bar.appendChild(fill); rate.appendChild(bar); tr.appendChild(rate);
+        tr.appendChild(el('td', 'num', r.w + '–' + r.l));
+        tbody.appendChild(tr);
+      });
+      q('[data-lp-total]').textContent = total + (total === 1 ? ' vote' : ' votes') + ' on this device';
+    }
+    function showResults() {
+      renderResults();
+      q('[data-lp-results]').hidden = false;
+      q('[data-lp-results]').scrollIntoView({ behavior: reduceMotion ? 'auto' : 'smooth', block: 'start' });
+    }
+
+    $$('.contender', root).forEach(function (btn) {
+      btn.addEventListener('click', function () { vote(+btn.dataset.side); });
+    });
+    document.addEventListener('keydown', function (e) {
+      if (!m || q('[data-lp-arena]').hidden || /input|textarea|select/i.test((e.target || {}).tagName || '')) return;
+      if (e.key === '1' || e.key === 'ArrowLeft') { e.preventDefault(); vote(0); }
+      if (e.key === '2' || e.key === 'ArrowRight') { e.preventDefault(); vote(1); }
+    });
+    $$('[data-lp-tab]', root).forEach(function (b) {
+      b.addEventListener('click', function () { if (b.dataset.lpTab === 'results') showResults(); else showArena(); });
+    });
+    q('[data-lp-next-round]').addEventListener('click', function () {
+      m.round += 1; m.seen = {}; lput(m).then(showArena);
+    });
+    q('[data-lp-reset]').addEventListener('click', function () {
+      if (!window.confirm('Clear every vote on this device for this match?')) return;
+      m.wins = {}; m.losses = {}; m.pairs = {}; m.seen = {}; m.round = 1; lput(m).then(showArena);
+    });
+    q('[data-lp-delete]').addEventListener('click', function () {
+      if (!window.confirm('Delete this match from this browser? This cannot be undone.')) return;
+      ldel(m.id).then(function () { location.href = siteUrl('/explore'); });
+    });
+    q('[data-lp-share]').addEventListener('click', function () {
+      var panel = q('[data-lp-share-panel]'), input = q('[data-lp-share-url]'), note = q('[data-lp-share-note]');
+      panel.hidden = false; note.textContent = 'Preparing the link…'; input.value = '';
+      shareUrlFor(m).then(function (url) {
+        input.value = url;
+        note.textContent = url.length > 60000 ? 'This link is long because it carries the photos. If an app cuts it off, send it by email or copy it into a note.' : '';
+        if (navigator.share) navigator.share({ title: m.title, url: url }).catch(function () {});
+      }).catch(function () { note.textContent = 'The link could not be created in this browser.'; });
+    });
+    q('[data-lp-copy]').addEventListener('click', function () {
+      var input = q('[data-lp-share-url]'), note = q('[data-lp-share-note]');
+      if (!input.value) return;
+      (navigator.clipboard ? navigator.clipboard.writeText(input.value) : Promise.reject()).then(function () {
+        note.textContent = 'Link copied.';
+      }).catch(function () { input.select(); note.textContent = 'Press Ctrl+C (or long-press) to copy.'; });
+    });
+  }
+
+  /* ---------- "Your matches" list ---------- */
+  var listRoot = $('[data-local-list]');
+  if (listRoot) {
+    var labels = {}; try { labels = JSON.parse(listRoot.dataset.labels || '{}'); } catch (e) {}
+    lall().then(function (items) {
+      var cat = listRoot.dataset.category;
+      items = items.filter(function (m) { return !cat || m.category === cat; }).sort(function (a, b) { return b.created - a.created; });
+      if (!items.length) { $('[data-local-empty]').hidden = false; return; }
+      items.forEach(function (m) {
+        var a = el('a', 'match-card'); a.href = siteUrl('/play') + '#id=' + encodeURIComponent(m.id);
+        var duo = el('div', 'duo'); duo.setAttribute('aria-hidden', 'true');
+        [0, 1].forEach(function (i) {
+          var p = m.people[i];
+          if (p && safeImg(p.img)) { var img = el('img'); img.src = p.img; img.alt = ''; img.loading = 'lazy'; duo.appendChild(img); }
+          else duo.appendChild(el('span', 'duo-empty', ''));
+        });
+        duo.appendChild(el('span', 'duo-vs', 'VS'));
+        var body = el('div', 'match-body');
+        body.appendChild(el('h3', null, m.title));
+        var meta = el('div', 'match-meta');
+        meta.appendChild(el('span', 'pill pill-cat', m.category === 'custom' && m.custom ? m.custom : (labels[m.category] || 'Custom')));
+        meta.appendChild(el('span', 'pill', m.mine ? 'Created here' : 'Shared with you'));
+        var votes = Object.keys(m.wins || {}).reduce(function (s, k) { return s + m.wins[k]; }, 0);
+        var meta2 = el('div', 'match-meta');
+        meta2.appendChild(el('span', null, m.people.length + ' contenders'));
+        meta2.appendChild(el('span', null, votes + (votes === 1 ? ' vote' : ' votes')));
+        body.appendChild(meta); body.appendChild(meta2);
+        a.appendChild(duo); a.appendChild(body);
+        listRoot.appendChild(a);
+      });
+    }).catch(function () { $('[data-local-empty]').hidden = false; });
   }
 })();

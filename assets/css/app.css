@@ -257,7 +257,7 @@ input:focus, select:focus, textarea:focus { outline: none; border-color: var(--x
 .stack { display: grid; gap: 16px; }
 
 /* ---------- arena ---------- */
-.arena-wrap { padding: 28px 0 12px; }
+.arena-wrap { padding-top: 28px; padding-bottom: 12px; }
 .arena-top { display: flex; justify-content: space-between; gap: 16px; align-items: center; flex-wrap: wrap; margin-bottom: 18px; }
 .arena-top h1 { font-size: clamp(1.4rem, 3vw, 2rem); margin: 0; }
 .arena-prompt { color: var(--x-muted); margin: 4px 0 0; }
@@ -553,3 +553,15 @@ main { animation: page-in .55s var(--ease) both; }
 .unavailable .btn-row { justify-content: center; }
 .unavailable-icon { display: inline-grid; place-items: center; width: 64px; height: 64px; border-radius: 20px; background: var(--x-ribbon); color: #fff; box-shadow: 0 12px 30px -10px rgba(24,140,241,.9); }
 .unavailable-icon .icon { width: 30px; height: 30px; }
+
+/* device mode (no database): play page, sharing, small helpers */
+.pills { display: flex; gap: 8px; flex-wrap: wrap; }
+.link-btn { background: none; border: 0; padding: 0; font: inherit; color: var(--x-blue-hi); cursor: pointer; text-decoration: underline; text-underline-offset: 3px; }
+.link-btn:hover { color: #fff; }
+.link-btn.danger { color: var(--x-bad); }
+.trust-stack { flex-direction: column; gap: 12px; margin: 0; font-size: .95rem; }
+.trust-stack li { align-items: flex-start; }
+.trust-stack .icon { margin-top: 3px; }
+.share-panel { margin: 0 0 18px; }
+.share-panel .share input { flex: 1; }
+[data-local-play] .arena-top .btn-row { gap: 8px; }

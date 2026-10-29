@@ -13,15 +13,22 @@ Vercel has no built-in PHP and no MySQL, and its servers have no permanent disk.
 | Image processing | GD re-encodes every photo | The browser resizes to JPEG; PHP validates and strips all metadata (GD is not available on Vercel) |
 | Maintenance | A cron job calls `/api/cron` | Vercel Cron calls `/api/cron` daily |
 
-## Preview mode: no database at all
+## Without a database: matches live in the browser
 
-Deployed as-is, with no `config/config.php`, the site runs on Vercel **without a database**. Nothing needs to be set up:
+Deployed as-is, with no `config/config.php`, the site runs on Vercel **without any database** and the main features still work:
 
-- The home page, Explore, categories, privacy and terms pages work normally. Listings are empty.
-- Creating matches, voting, reporting, the contact form and the admin dashboard show a friendly "coming soon" page instead, because they must save data and Vercel has no permanent disk.
+- **Create a match.** The normal form saves the match and its photos in the visitor's own browser (IndexedDB). Nothing is uploaded to the server.
+- **Vote and see results.** `/play` shows head-to-head matchups, a progress bar, live standings (win rate, then total wins, ties share a place), and a "Next voter" button so a group can pass one phone around.
+- **Share.** The Share button makes a link that carries the whole match, with smaller photos, in the part of the URL after `#`, which browsers never send to the server. Anyone who opens it gets the match on their own device and can vote there.
+- **Your matches.** Explore and the category pages list the matches saved in this browser.
 
-To switch on every feature later, connect a database as described below. The "coming soon" pages disappear automatically.
+What this mode cannot do, because there is nowhere shared to keep data:
 
+- Votes from different people are not added together. Each device has its own standings.
+- Clearing the browser's site data deletes its matches.
+- There is no public listing of other people's matches, no moderation, no admin dashboard, no reports or contact form, and no ads. Those pages say they are not available.
+
+To get shared results, accounts for admins and everything else, connect a MySQL database as described below. The site switches to the full version automatically.
 ## 1. Create a MySQL database
 
 Vercel does not host MySQL. Use a MySQL 8 or MariaDB service that accepts connections from the internet, for example TiDB Cloud Serverless, Aiven for MySQL, Railway or your own server. Free hosting databases such as InfinityFree only accept connections from their own servers and will not work.

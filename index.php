@@ -42,20 +42,30 @@ $routes = [
     '#^/contact$#'                            => 'page_contact',
     '#^/privacy$#'                            => 'page_privacy',
     '#^/terms$#'                              => 'page_terms',
+    '#^/play$#'                               => 'page_play_local',
 ];
 
 // Without a database only pages that store nothing run; the rest explain what is missing.
 $withoutDb = [
-    'page_home' => true, 'page_explore' => true, 'page_category' => true, 'page_privacy' => true, 'page_terms' => true,
+    'page_home' => true, 'page_create' => true, 'page_privacy' => true, 'page_terms' => true, 'page_play_local' => true,
 ];
+// Pages that have a browser-storage version when there is no database.
+$deviceVersion = ['page_explore' => 'page_local_list', 'page_category' => 'page_local_list'];
 $unavailable = [
-    'page_create' => 'Creating matches', 'page_created' => 'Creating matches', 'page_report' => 'Reporting',
+    'page_created' => 'Creating matches', 'page_report' => 'Reporting',
     'page_contact' => 'The contact form', 'api_next' => 'Voting', 'api_vote' => 'Voting',
 ];
 
 foreach ($routes as $pattern => $handler) {
     if (preg_match($pattern, $path, $m)) {
         array_shift($m);
+        if (!db_enabled() && isset($deviceVersion[$handler])) {
+            $deviceVersion[$handler](...$m);
+            exit;
+        }
+        if (db_enabled() && $handler === 'page_play_local') {
+            not_found(); // only exists when matches live in the browser
+        }
         if (!db_enabled() && !isset($withoutDb[$handler])) {
             isset($unavailable[$handler]) ? page_unavailable($unavailable[$handler]) : not_found();
             exit;

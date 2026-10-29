@@ -93,6 +93,9 @@ function page_create(): void
     if ($pre !== '' && isset(categories()[$pre])) {
         $old['category'] = $pre; // from a category tile on the home page
     }
+    if (!db_enabled() && is_post()) {
+        redirect('/create'); // matches are created in the browser in this mode
+    }
     if (is_post()) {
         // post_max_size exceeded: PHP silently drops the whole body.
         if (empty($_POST) && (int)($_SERVER['CONTENT_LENGTH'] ?? 0) > 0) {
@@ -112,6 +115,7 @@ function page_create(): void
         'minP' => setting_int('min_participants', 2),
         'maxP' => setting_int('max_participants', 20),
         'maxMb' => setting_int('max_upload_mb', 5),
+        'local' => !db_enabled(),
         'bodyClass' => 'page-create',
     ]);
 }
@@ -767,15 +771,40 @@ function page_contact(): void
         'contactEmail' => (string)setting('contact_email', '')]);
 }
 
+/** Without a database: play and see results for a match saved in this browser (or opened from a share link). */
+function page_play_local(): void
+{
+    render('local_play', [
+        'title' => 'Play a match',
+        'categoryPrompts' => array_map(static fn($c) => $c['prompt'], categories()),
+        'categoryLabels' => array_map(static fn($c) => $c['label'], categories()),
+        'noindex' => true,
+        'bodyClass' => 'page-play',
+    ]);
+}
+
+/** Without a database: Explore lists the matches saved in this browser. */
+function page_local_list(?string $category = null): void
+{
+    if ($category !== null && !isset(categories()[$category])) {
+        not_found();
+    }
+    render('local_list', [
+        'title' => $category ? category_label(['category' => $category]) . ' matches' : 'Your matches',
+        'fixedCategory' => $category,
+        'categoryLabels' => array_map(static fn($c) => $c['label'], categories()),
+    ]);
+}
+
 /** Shown for features that must store data when the site runs without a database. */
 function page_unavailable(string $feature): void
 {
     if (is_api_request()) {
-        json_out(['ok' => false, 'error' => 'unavailable', 'message' => $feature . ' is not available on this site yet.'], 503);
+        json_out(['ok' => false, 'error' => 'unavailable', 'message' => $feature . ' is not available on this site.'], 503);
     }
     http_response_code(503);
     header('Retry-After: 86400');
-    render('unavailable', ['title' => $feature . ' is coming soon', 'feature' => $feature, 'noindex' => true]);
+    render('unavailable', ['title' => $feature . ' is not available', 'feature' => $feature, 'noindex' => true]);
 }
 
 function page_privacy(): void

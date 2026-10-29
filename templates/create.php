@@ -5,11 +5,16 @@ $rows = max($minP, count($o['names']), min($maxP, (int)($_GET['rows'] ?? 0)));
 $pe = $errors['people'] ?? [];
 $err = static fn(string $k) => !empty($errors[$k]) && is_string($errors[$k]) ? ' has-error' : '';
 $formClass = ($o['category'] === 'custom' ? 'show-custom ' : '') . ($o['visibility'] === 'private' ? 'show-private' : '');
+$local = !empty($local); // no database: the match is saved in this browser
 ?>
 <section class="page-head">
   <div class="container narrow">
     <h1>Start a match</h1>
+    <?php if ($local): ?>
+    <p>Add <?= $minP ?>–<?= $maxP ?> contenders and choose what voters should judge. Your match is saved in this browser, and you get a link to share it with friends.</p>
+    <?php else: ?>
     <p>Add <?= $minP ?>–<?= $maxP ?> contenders, choose what voters should judge, and decide who can see it. You will get a share link and a private link to manage the match.</p>
+    <?php endif; ?>
   </div>
 </section>
 <div class="container narrow">
@@ -19,7 +24,7 @@ $formClass = ($o['category'] === 'custom' ? 'show-custom ' : '') . ($o['visibili
       <?php if ($pe || !empty($errors['participants'])): ?><br>Photos can’t be kept between attempts, so choose them again for each contender.<?php endif; ?>
     </div>
   <?php endif; ?>
-  <form method="post" action="<?= e(url('/create')) ?>" enctype="multipart/form-data" class="create-steps <?= e($formClass) ?>" data-create-form
+  <form method="post" action="<?= e(url('/create')) ?>" enctype="multipart/form-data" class="create-steps <?= e($formClass) ?>" data-create-form<?= $local ? ' data-local' : '' ?>
         data-min="<?= (int)$minP ?>" data-max="<?= (int)$maxP ?>" data-max-mb="<?= (int)$maxMb ?>" novalidate>
     <?= csrf_field() ?>
     <input type="hidden" name="tz_offset" value="0" data-tz>
@@ -55,7 +60,7 @@ $formClass = ($o['category'] === 'custom' ? 'show-custom ' : '') . ($o['visibili
 
     <section class="card pad">
       <div class="step-title"><span class="n">2</span><h2>Contenders</h2></div>
-      <p class="muted small">Tap a box to add a photo from your phone or computer. Any JPG, PNG or WebP works, and big photos are resized for you. Location and camera details are removed before anything is saved.</p>
+      <p class="muted small">Tap a box to add a photo from your phone or computer. Any JPG, PNG or WebP works, and big photos are resized for you. Location and camera details are removed<?= $local ? '' : ' before anything is saved' ?>.</p>
       <?php if (!empty($errors['participants'])): ?><p class="field-error"><?= e($errors['participants']) ?></p><?php endif; ?>
       <div class="people-editor" data-people>
         <?php for ($i = 0; $i < $rows; $i++): ?>
@@ -80,6 +85,16 @@ $formClass = ($o['category'] === 'custom' ? 'show-custom ' : '') . ($o['visibili
       </template>
     </section>
 
+    <?php if ($local): ?>
+    <section class="card pad">
+      <div class="step-title"><span class="n">3</span><h2>Sharing</h2></div>
+      <ul class="trust trust-stack">
+        <li><?= icon('lock') ?> The match and its photos are saved only in this browser.</li>
+        <li><?= icon('link') ?> After creating it you get a share link. Anyone who opens it can vote on their own phone or computer.</li>
+        <li><?= icon('chart') ?> Each device keeps its own results. Pass one phone around to vote together.</li>
+      </ul>
+    </section>
+    <?php else: ?>
     <section class="card pad">
       <div class="step-title"><span class="n">3</span><h2>Who can see it</h2></div>
       <div class="form-stack">
@@ -112,6 +127,7 @@ $formClass = ($o['category'] === 'custom' ? 'show-custom ' : '') . ($o['visibili
         </div>
       </div>
     </section>
+    <?php endif; ?>
 
     <section class="card pad">
       <div class="step-title"><span class="n">4</span><h2>Confirm</h2></div>
