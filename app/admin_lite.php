@@ -107,12 +107,20 @@ function lite_post_ok(): bool
 
 function lite_password_ok(string $password): bool
 {
-    $hash = env_value('ADMIN_PASSWORD_HASH');
-    if ($hash !== '') {
-        return password_verify($password, $hash);
+    $ok = false;
+    foreach (['ADMIN_PASSWORD_HASH', 'ADMIN_PASSWORD'] as $var) {
+        $stored = env_value($var);
+        if ($stored === '') {
+            continue;
+        }
+        if (password_get_info($stored)['algo'] !== null) {
+            $ok = password_verify($password, $stored) || $ok;          // a real bcrypt/argon hash
+        } elseif (strlen($stored) >= 12) {
+            // A plain password, also when it was put in ADMIN_PASSWORD_HASH by mistake.
+            $ok = hash_equals(hash('sha256', $stored), hash('sha256', $password)) || $ok;
+        }
     }
-    $plain = env_value('ADMIN_PASSWORD');
-    return strlen($plain) >= 12 && hash_equals(hash('sha256', $plain), hash('sha256', $password));
+    return $ok;
 }
 
 function lite_render(string $view, array $vars = []): void
@@ -151,7 +159,7 @@ function admin_lite(string $route): void
                 redirect('/admin/');
             } else {
                 usleep(random_int(600000, 1100000)); // slows guessing; there is no shared store for lockouts
-                $error = 'That email and password don’t match.';
+                $error = 'That email and password don’t match. They must be exactly ADMIN_EMAIL and ADMIN_PASSWORD from Vercel’s environment variables, and Vercel only uses changed values after a redeploy.';
             }
         } elseif (lite_current()) {
             redirect('/admin/');

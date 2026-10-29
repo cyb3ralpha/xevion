@@ -187,7 +187,15 @@ function uuid4(): string
 function env_value(string $key, string $default = ''): string
 {
     $v = getenv($key);
-    return ($v === false || trim((string)$v) === '') ? $default : trim((string)$v);
+    if ($v === false) {
+        return $default;
+    }
+    $v = trim((string)$v);
+    // Tolerate values pasted with surrounding quotes, e.g. "secret" or 'secret'.
+    if (strlen($v) >= 2 && ($v[0] === '"' || $v[0] === "'") && $v[strlen($v) - 1] === $v[0]) {
+        $v = trim(substr($v, 1, -1));
+    }
+    return $v === '' ? $default : $v;
 }
 
 /** Public contact address: the admin setting in database mode, otherwise CONTACT_EMAIL. */

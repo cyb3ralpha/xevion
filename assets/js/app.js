@@ -220,7 +220,15 @@
         var problem = checkFile(f);
         if (problem) { file.value = ''; label.textContent = '+ Add photo'; rowError(r, problem); return; }
         sniffImage(f).then(function (ok) {
-          if (!ok) { file.value = ''; label.textContent = '+ Add photo'; rowError(r, 'This file is not a real JPG, PNG or WebP image.'); return; }
+          if (!ok) {
+            file.value = ''; label.textContent = '+ Add photo';
+            isHeic(f).then(function (heic) {
+              rowError(r, heic
+                ? 'This is an iPhone HEIC photo, which browsers can’t read. Save it as JPG (or set Camera → Formats → Most Compatible) and try again.'
+                : 'This file is not a real JPG, PNG or WebP image.');
+            });
+            return;
+          }
           var img = document.createElement('img'); img.alt = ''; img.src = URL.createObjectURL(f);
           drop.insertBefore(img, file); label.textContent = 'Change photo';
         });
@@ -233,7 +241,9 @@
       });
     };
     function checkFile(f) {
-      if (['image/jpeg', 'image/png', 'image/webp'].indexOf(f.type) < 0) return 'Use a JPG, PNG or WebP image.';
+      // Some phones and apps give no file type at all; the file's own bytes decide (sniffImage).
+      var t = (f.type || '').toLowerCase();
+      if (t && ['image/jpeg', 'image/jpg', 'image/pjpeg', 'image/png', 'image/webp', 'image/heic', 'image/heif'].indexOf(t) < 0) return 'Use a JPG, PNG or WebP image.';
       // Large originals are fine when the browser can resize them before upload.
       var limitMb = canShrink ? Math.max(maxMb, 30) : maxMb;
       if (f.size > limitMb * 1048576) return 'This photo is larger than ' + limitMb + ' MB.';
@@ -494,6 +504,11 @@
     return file.slice(0, 12).arrayBuffer().then(function (buf) {
       var b = new Uint8Array(buf), at = function (i, str) { for (var k = 0; k < str.length; k++) if (b[i + k] !== str.charCodeAt(k)) return false; return true; };
       return (b[0] === 0xFF && b[1] === 0xD8 && b[2] === 0xFF) || at(0, '\x89PNG') || (at(0, 'RIFF') && at(8, 'WEBP'));
+    }).catch(function () { return false; });
+  }
+  function isHeic(file) {
+    return file.slice(4, 12).arrayBuffer().then(function (buf) {
+      return /^ftyp(heic|heix|hevc|heim|heis|mif1|msf1)$/.test(String.fromCharCode.apply(null, new Uint8Array(buf)));
     }).catch(function () { return false; });
   }
   function fileToJpeg(file, maxW, maxH, quality) {

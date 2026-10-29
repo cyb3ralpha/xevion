@@ -99,6 +99,8 @@ Headless Chrome will not lay out narrower than 512px with `--window-size`. For r
 
 16. **Oct 28: live review and admin without a database.** Browsed www.xevion.pk with a DevTools script that records JS exceptions, console errors and failed requests: no errors, no broken images. Corrections: Contact and Report became real pages (`local_contact.php`, using `CONTACT_EMAIL`), Privacy describes browser mode, the home "Share the link" step matches the mode, the play page shows its match ID with a Report link. Added `app/admin_lite.php` + `templates/admin/lite.php`: sign-in from `ADMIN_EMAIL` + `ADMIN_PASSWORD_HASH`/`ADMIN_PASSWORD` env vars, HMAC-signed cookie session, double-submit CSRF + Origin check (host and port), Status, Moderation (decode a share link without saving; `BLOCKED_MATCHES` env list enforced on /play and in lists) and device matches (delete, JSON backup and validated restore). Fixed during testing: the Origin check compared host only, so browser sign-in failed when a port was present. `.env.example` added.
 
+17. **Oct 29: fixes after owner testing.** Photos with an empty MIME type (some phones and apps) were rejected before the byte check ran; now only a wrong non-empty type is refused and the file signature decides. iPhone HEIC files get a specific message. Admin sign-in now tolerates a plain password placed in `ADMIN_PASSWORD_HASH` and quoted env values, and the error explains what must match (and that Vercel needs a redeploy after changes).
+
 ## Known limits and open items
 
 - The live Vercel deployment could not be inspected: the owner's Vercel project is not visible to the connected Vercel account.
