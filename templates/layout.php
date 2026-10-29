@@ -41,7 +41,6 @@ $navCurrent = static fn(string $p) => ($path === $p || ($p !== '/' && str_starts
     </div>
   </nav>
 </header>
-<?php if (!db_enabled()): ?><div class="preview-bar" role="status"><?= icon('sparkle') ?> Preview mode: browse freely. Creating matches and voting are coming soon.</div><?php endif; ?>
 <main id="main">
   <?php $fl = flashes(); if ($fl): ?>
   <div class="container flash-stack" role="status">

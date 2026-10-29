@@ -18,10 +18,9 @@ Vercel has no built-in PHP and no MySQL, and its servers have no permanent disk.
 Deployed as-is, with no `config/config.php`, the site runs on Vercel **without a database**. Nothing needs to be set up:
 
 - The home page, Explore, categories, privacy and terms pages work normally. Listings are empty.
-- A slim banner says the site is in preview mode.
 - Creating matches, voting, reporting, the contact form and the admin dashboard show a friendly "coming soon" page instead, because they must save data and Vercel has no permanent disk.
 
-To switch on every feature later, connect a database as described below. The banner and the "coming soon" pages disappear automatically.
+To switch on every feature later, connect a database as described below. The "coming soon" pages disappear automatically.
 
 ## 1. Create a MySQL database
 

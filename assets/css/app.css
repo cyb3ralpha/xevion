@@ -546,9 +546,7 @@ main { animation: page-in .55s var(--ease) both; }
 /* nav links with icons */
 .nav-links a { display: inline-flex; align-items: center; gap: 6px; }
 
-/* preview mode (no database): banner and "coming soon" page */
-.preview-bar { display: flex; align-items: center; justify-content: center; gap: 8px; padding: 9px 16px; font-size: .88rem; text-align: center; color: #fff; background: linear-gradient(90deg, rgba(24,140,241,.22), rgba(6,89,165,.22)); border-bottom: 1px solid var(--x-line); }
-.preview-bar .icon { color: var(--x-blue-hi); }
+/* "coming soon" page (no database) */
 .unavailable { text-align: center; padding: 56px 24px; border-radius: var(--r-lg); border: 1px solid var(--x-line); background: radial-gradient(ellipse at 50% 0%, rgba(24,140,241,.25), transparent 60%), var(--x-panel); }
 .unavailable h1 { font-size: clamp(1.6rem, 4vw, 2.4rem); margin-top: 18px; }
 .unavailable p { color: var(--x-muted); max-width: 48ch; margin: 0 auto 24px; }
