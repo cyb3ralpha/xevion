@@ -103,6 +103,8 @@ Headless Chrome will not lay out narrower than 512px with `--window-size`. For r
 
 18. **Oct 29: stale browser cache.** On Vercel every deployed file has mtime 0, so `asset()` produced `?v=000000` forever and browsers kept a 30-day-cached old `app.js`; the owner's browser still ran pre-fix code, which posted the create form to the server, where it silently reloaded. Static URLs are now versioned by content (`file_version()`, MD5 prefix). A create POST without a database now shows "outdated version" guidance and keeps the typed fields instead of redirecting.
 
+19. **Oct 29: full live review.** Audited every page on desktop and phone (broken images, alt text, unnamed controls, unlabeled inputs, duplicate ids, h1 count, overflow, console errors, failed requests) and exercised every play-page control live (keyboard and tap voting, round complete, standings, next voter, share, copy, reset, delete). Fixes: play-page states use a real h1, home tab title no longer repeats the brand, the closing band and the Terms (moderation, your content) describe browser mode accurately, Copy falls back to execCommand, and keyboard hints are hidden on touch screens.
+
 ## Known limits and open items
 
 - The live Vercel deployment could not be inspected: the owner's Vercel project is not visible to the connected Vercel account.

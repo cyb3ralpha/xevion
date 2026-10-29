@@ -565,3 +565,7 @@ main { animation: page-in .55s var(--ease) both; }
 .share-panel { margin: 0 0 18px; }
 .share-panel .share input { flex: 1; }
 [data-local-play] .arena-top .btn-row { gap: 8px; }
+
+/* touch screens: hide keyboard shortcuts; state headings sized like section titles */
+@media (hover: none) and (pointer: coarse) { .kbd-hint { display: none; } }
+.state-title { font-size: clamp(1.4rem, 2.6vw, 1.9rem); }

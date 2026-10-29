@@ -852,7 +852,11 @@
       if (!input.value) return;
       (navigator.clipboard ? navigator.clipboard.writeText(input.value) : Promise.reject()).then(function () {
         note.textContent = 'Link copied.';
-      }).catch(function () { input.select(); note.textContent = 'Press Ctrl+C (or long-press) to copy.'; });
+      }).catch(function () {
+        input.focus(); input.select(); input.setSelectionRange(0, input.value.length);
+        var ok = false; try { ok = document.execCommand('copy'); } catch (e) {}
+        note.textContent = ok ? 'Link copied.' : 'Press Ctrl+C (or long-press) to copy.';
+      });
     });
     }
   }

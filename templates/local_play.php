@@ -9,20 +9,20 @@ foreach ($categoryLabels as $k => $label) {
   <div data-lp-loading class="arena-state card"><p class="muted">Loading the match…</p></div>
 
   <div data-lp-blocked class="arena-state card" hidden>
-    <h2>This match was removed</h2>
+    <h1 class="state-title">This match was removed</h1>
     <p class="muted">The site administrator has blocked this match, so it can’t be opened here.</p>
     <div class="btn-row" style="justify-content:center"><a class="btn btn-primary" href="<?= e(url('/create')) ?>"><?= icon('plus') ?> Start a match</a></div>
   </div>
 
   <div data-lp-missing class="arena-state card" hidden>
-    <h2>Match not found</h2>
+    <h1 class="state-title">Match not found</h1>
     <p class="muted">This match isn’t saved in this browser, or the link is incomplete. Ask for the share link again, or start your own.</p>
     <div class="btn-row" style="justify-content:center"><a class="btn btn-primary" href="<?= e(url('/create')) ?>"><?= icon('plus') ?> Start a match</a></div>
   </div>
 
   <form data-lp-locked class="arena-state card" hidden>
     <span class="unavailable-icon"><?= icon('lock') ?></span>
-    <h2 style="margin-top:14px">This match is private</h2>
+    <h1 class="state-title" style="margin-top:14px">This match is private</h1>
     <p class="muted">Enter the access code the organiser sent you.</p>
     <div class="share" style="max-width:360px;margin:0 auto">
       <input type="text" name="code" autocomplete="off" autocapitalize="characters" spellcheck="false" maxlength="24" aria-label="Access code" required>
@@ -57,12 +57,12 @@ foreach ($categoryLabels as $k => $label) {
       <div class="arena" data-lp-grid>
         <button class="contender left" type="button" data-side="0" aria-label="Vote for the left contender">
           <img alt="" data-lp-img>
-          <span class="name"><span data-lp-name></span><span class="hint">Press 1 or ←</span></span>
+          <span class="name"><span data-lp-name></span><span class="hint kbd-hint">Press 1 or ←</span></span>
         </button>
         <div class="vs-core" aria-hidden="true"><span class="wing l"></span><span class="wing r"></span><b>VS</b></div>
         <button class="contender right" type="button" data-side="1" aria-label="Vote for the right contender">
           <img alt="" data-lp-img>
-          <span class="name"><span data-lp-name></span><span class="hint">Press 2 or →</span></span>
+          <span class="name"><span data-lp-name></span><span class="hint kbd-hint">Press 2 or →</span></span>
         </button>
       </div>
       <p class="arena-status" data-lp-status aria-live="polite"></p>
@@ -88,7 +88,7 @@ foreach ($categoryLabels as $k => $label) {
     </section>
 
     <div class="arena-foot">
-      <span>Tap a photo to vote. Keyboard: <span class="kbd">1</span> / <span class="kbd">←</span> left, <span class="kbd">2</span> / <span class="kbd">→</span> right.</span>
+      <span>Tap a photo to vote.<span class="kbd-hint"> Keyboard: <span class="kbd">1</span> / <span class="kbd">←</span> left, <span class="kbd">2</span> / <span class="kbd">→</span> right.</span></span>
       <span><span class="muted">Match ID <code data-lp-id></code></span> · <a href="<?= e(url('/report')) ?>">Report</a> · <button class="link-btn" type="button" data-lp-reset>Reset votes</button> · <button class="link-btn danger" type="button" data-lp-delete>Delete match</button></span>
     </div>
   </div>

@@ -17,9 +17,9 @@
     <li>Spam, scams or unsolicited advertising inside matches.</li>
   </ul>
   <h2>Moderation</h2>
-  <p>Public matches are reviewed before they are listed. Moderators may hide, remove or suspend any content and void votes that look automated or fraudulent. Reported photos may be hidden while they are reviewed.</p>
+  <p><?php if (!db_enabled()): ?>Matches are saved on visitors’ own devices and travel inside share links, so we can’t review them in advance. If a match is reported, we can block it so it no longer opens on this site; copies already saved on someone’s device can only be deleted by that person.<?php else: ?>Public matches are reviewed before they are listed. Moderators may hide, remove or suspend any content and void votes that look automated or fraudulent. Reported photos may be hidden while they are reviewed.<?php endif; ?></p>
   <h2>Your content</h2>
-  <p>You keep ownership of what you upload. You give XEVION permission to store, process and display it within FaceMatch for as long as the match exists. You are responsible for the content you upload and for keeping your management link private.</p>
+  <p><?php if (!db_enabled()): ?>You keep ownership of your photos. They stay in your browser and are only shared when you send someone a link. You are responsible for what you create and share, and for only sharing links with people you trust.<?php else: ?>You keep ownership of what you upload. You give XEVION permission to store, process and display it within FaceMatch for as long as the match exists. You are responsible for the content you upload and for keeping your management link private.<?php endif; ?></p>
   <h2>Advertising</h2>
   <p>Paid placements are labelled “Advertisement” or “Sponsored”. They are not an endorsement by XEVION of the advertiser or by any contender.</p>
   <h2>No warranty</h2>

@@ -20,7 +20,7 @@ function page_home(): void
     $trending = $db ? comp_listing(['sort' => 'trending', 'status' => 'open'], 6) : [];
     $recent = $db ? comp_listing(['sort' => 'recent'], 6) : [];
     render('home', [
-        'title' => 'FaceMatch — photo face-offs by XEVION',
+        'title' => 'Photo face-offs',
         'featured' => $featured,
         'trending' => $trending,
         'recent' => $recent,

@@ -29,7 +29,7 @@
             <button class="contender <?= $i === 0 ? 'left' : 'right' ?>" type="submit" name="choice" value="<?= e($side['id']) ?>" data-choice="<?= e($side['id']) ?>" aria-label="Vote for <?= e($side['name']) ?>">
               <img src="<?= e($side['image']) ?>" alt="" width="600" height="750">
               <span class="split" data-split></span>
-              <span class="name"><span data-name><?= e($side['name']) ?></span><span class="hint">Press <?= $i === 0 ? '1 or ←' : '2 or →' ?></span></span>
+              <span class="name"><span data-name><?= e($side['name']) ?></span><span class="hint kbd-hint">Press <?= $i === 0 ? '1 or ←' : '2 or →' ?></span></span>
             </button>
           <?php endforeach; ?>
         </div>
@@ -56,7 +56,7 @@
   </div>
 
   <div class="arena-foot">
-    <span>Tap a photo to vote. Keyboard: <span class="kbd">1</span> / <span class="kbd">←</span> left, <span class="kbd">2</span> / <span class="kbd">→</span> right.</span>
+    <span>Tap a photo to vote.<span class="kbd-hint"> Keyboard: <span class="kbd">1</span> / <span class="kbd">←</span> left, <span class="kbd">2</span> / <span class="kbd">→</span> right.</span></span>
     <span>
       <?php if ($resultsVisible): ?><a href="<?= e(url('/m/' . $c['slug'] . '/results')) ?>">Results</a> · <?php endif; ?>
       <a href="<?= e(url('/report', ['m' => $c['slug']])) ?>">Report</a>

@@ -73,7 +73,7 @@ $lists = [
     <div class="cta-band" data-reveal>
       <div>
         <h2><?= $isEmpty ? 'Be the first face-off' : 'Ready for a face-off?' ?></h2>
-        <p><?= $isEmpty ? 'No public matches yet. Start one now and share it with your friends.' : 'Set one up in a minute and share the link with your group.' ?></p>
+        <p><?= !db_enabled() ? 'Add a few photos, pick a question and share the link with your friends. It takes about a minute.' : ($isEmpty ? 'No public matches yet. Start one now and share it with your friends.' : 'Set one up in a minute and share the link with your group.') ?></p>
       </div>
       <a class="btn btn-primary btn-lg btn-shine" href="<?= e(url('/create')) ?>">Start a match <?= icon('arrow') ?></a>
     </div>
