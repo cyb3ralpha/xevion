@@ -67,7 +67,7 @@ $navCurrent = static fn(string $p) => ($path === $p || ($p !== '/' && str_starts
       <div>
         <h4>Trust &amp; safety</h4>
         <ul>
-          <li><a href="<?= e(url('/report')) ?>">Report content</a></li>
+          <li><a href="<?= e(url('/report')) ?>">Report a match</a></li>
           <li><a href="<?= e(url('/privacy')) ?>">Privacy policy</a></li>
           <li><a href="<?= e(url('/terms')) ?>">Terms of service</a></li>
           <li><a href="<?= e(url('/contact')) ?>">Contact</a></li>

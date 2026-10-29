@@ -1,5 +1,18 @@
 <section class="page-head"><div class="container"><h1>Privacy Policy</h1><p>How XEVION FaceMatch handles information. Plain-language summary of what the service actually does.</p></div></section>
 <div class="container prose">
+<?php if (!db_enabled()): ?>
+  <h2>How this site handles your data</h2>
+  <p>This site runs without a database. Matches you create are kept <strong>in your own browser</strong> and are never uploaded to our servers.</p>
+  <ul>
+    <li><strong>Photos and names</strong> are resized and redrawn in your browser, which removes metadata such as GPS location, and are saved in your browser’s storage.</li>
+    <li><strong>Votes and results</strong> are counted on your device only. We never receive them.</li>
+    <li><strong>Share links</strong> carry the match, including smaller photos, after the <code>#</code> in the address. Browsers never send that part to servers, so it doesn’t reach us or appear in our logs. Anyone you give the link to can see the match; private matches also need the access code.</li>
+    <li><strong>Deleting:</strong> use “Delete match” on the match page, or clear this site’s data in your browser. Copies that other people opened stay on their devices; ask them to delete them.</li>
+    <li><strong>Server logs:</strong> our hosting provider (Vercel) keeps standard request logs, such as the page address without the part after <code>#</code>, for security and reliability.</li>
+  </ul>
+  <p>We don’t use advertising trackers, third-party analytics, cookies for tracking or browser fingerprinting.</p>
+  <?php if (site_contact_email() !== ''): ?><p>Questions or removal requests: <a href="mailto:<?= e(site_contact_email()) ?>"><?= e(site_contact_email()) ?></a>.</p><?php endif; ?>
+<?php else: ?>
   <h2>What we collect</h2>
   <ul>
     <li><strong>Photos and names you upload</strong> for a match. Photos are decoded and saved as new image files, which removes embedded metadata such as GPS location and camera details. Originals are not kept.</li>
@@ -25,4 +38,5 @@
   </ul>
   <h2>Limits of anonymous voting</h2>
   <p>Because FaceMatch doesn’t require accounts, we can’t guarantee that each vote comes from a different person. We use browser identifiers and rate limits to discourage repeated voting, but results are entertainment, not verified polls.</p>
+<?php endif; ?>
 </div>

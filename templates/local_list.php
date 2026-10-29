@@ -12,7 +12,7 @@
       <a class="chip" href="<?= e(url('/category/' . $key)) ?>"<?= $fixedCategory === $key ? ' aria-current="true"' : '' ?>><?= icon(category_icon($key)) ?> <?= e($cat['label']) ?></a>
     <?php endforeach; ?>
   </nav>
-  <div class="match-grid" data-local-list data-category="<?= e((string)$fixedCategory) ?>"
+  <div class="match-grid" data-local-list data-blocked="<?= e(json_encode($blocked)) ?>" data-category="<?= e((string)$fixedCategory) ?>"
        data-labels="<?= e(json_encode($categoryLabels, JSON_UNESCAPED_UNICODE)) ?>"></div>
   <div class="empty" data-local-empty hidden>
     <h2>No matches here yet</h2>

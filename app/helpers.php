@@ -183,6 +183,27 @@ function uuid4(): string
     return vsprintf('%s%s-%s-%s-%s-%s%s%s', str_split(bin2hex($b), 4));
 }
 
+/** A deployment setting from the environment (Vercel → Settings → Environment Variables). */
+function env_value(string $key, string $default = ''): string
+{
+    $v = getenv($key);
+    return ($v === false || trim((string)$v) === '') ? $default : trim((string)$v);
+}
+
+/** Public contact address: the admin setting in database mode, otherwise CONTACT_EMAIL. */
+function site_contact_email(): string
+{
+    $email = db_enabled() ? (string)setting('contact_email', '') : env_value('CONTACT_EMAIL');
+    return filter_var($email, FILTER_VALIDATE_EMAIL) ? $email : '';
+}
+
+/** Match IDs the admin blocked (BLOCKED_MATCHES, comma separated). Used without a database. */
+function blocked_matches(): array
+{
+    $ids = array_filter(array_map('trim', explode(',', strtolower(env_value('BLOCKED_MATCHES')))));
+    return array_values(array_filter($ids, static fn($id) => (bool)preg_match('/^[a-z0-9]{6,40}$/', $id)));
+}
+
 /**
  * True when config/config.php names a database. Without one the site runs as a
  * showcase: public pages work, and features that must store data say so politely.

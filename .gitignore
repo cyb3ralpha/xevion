@@ -5,3 +5,6 @@ media/uploads/*
 storage/logs/*
 storage/installed.lock
 !storage/**/.gitkeep
+.env
+.env.*
+!.env.example

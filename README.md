@@ -12,9 +12,10 @@ Plain PHP 8.1+, no framework, no Composer or npm packages and no build step.
 | Photos | Resized in the browser, kept in browser storage and inside share links. Never uploaded | Uploaded, re-encoded and stored in `media/uploads/` (or MySQL on Vercel) |
 | Sharing | Link carries the match; **private** matches use an encrypted link plus an access code | Public listing after review, or unguessable invite links with optional code |
 | Results | Per device, never combined across people | Combined for everyone, with duplicate-vote limits |
-| Explore, admin, moderation, reports, ads | Explore lists the device's own matches; the rest is unavailable | Full |
+| Admin dashboard | Status, moderation by share link (block list), matches in the admin's browser, backups | Full: matches, photos, reports, ads, administrators, settings |
+| Explore, reports, ads | Explore lists the device's own matches; reports go by email | Full |
 
-Nothing is configured to get the first column: deploy the repository to Vercel as-is. For the second column see **[docs/DEPLOYMENT.md](docs/DEPLOYMENT.md)** and **[docs/VERCEL.md](docs/VERCEL.md)**.
+Nothing is configured to get the first column: deploy the repository to Vercel as-is. To switch on its admin dashboard, set the variables in [.env.example](.env.example) in Vercel. For the second column see **[docs/DEPLOYMENT.md](docs/DEPLOYMENT.md)** and **[docs/VERCEL.md](docs/VERCEL.md)**.
 
 ## Run it locally
 
@@ -25,7 +26,7 @@ Without `config/config.php` the site runs in browser mode. With it, the first vi
 
 ## Deploy on Vercel
 
-Import the GitHub repository into Vercel and keep the defaults; `vercel.json` sets up the PHP runtime and routes. No environment variables are needed for browser mode. Details, the optional database and troubleshooting: **[docs/VERCEL.md](docs/VERCEL.md)**.
+Import the GitHub repository into Vercel and keep the defaults; `vercel.json` sets up the PHP runtime and routes. The site works without environment variables; the admin dashboard needs `ADMIN_EMAIL` and `ADMIN_PASSWORD` (see [.env.example](.env.example)). Details, the optional database and troubleshooting: **[docs/VERCEL.md](docs/VERCEL.md)**.
 
 ## Structure
 

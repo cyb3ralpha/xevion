@@ -5,8 +5,14 @@ foreach ($categoryLabels as $k => $label) {
     $cats[$k] = ['l' => $label, 'p' => $categoryPrompts[$k] ?? ''];
 }
 ?>
-<div class="container arena-wrap" data-local-play data-cats="<?= e(json_encode($cats, JSON_UNESCAPED_UNICODE)) ?>">
+<div class="container arena-wrap" data-local-play data-cats="<?= e(json_encode($cats, JSON_UNESCAPED_UNICODE)) ?>" data-blocked="<?= e(json_encode($blocked)) ?>">
   <div data-lp-loading class="arena-state card"><p class="muted">Loading the match…</p></div>
+
+  <div data-lp-blocked class="arena-state card" hidden>
+    <h2>This match was removed</h2>
+    <p class="muted">The site administrator has blocked this match, so it can’t be opened here.</p>
+    <div class="btn-row" style="justify-content:center"><a class="btn btn-primary" href="<?= e(url('/create')) ?>"><?= icon('plus') ?> Start a match</a></div>
+  </div>
 
   <div data-lp-missing class="arena-state card" hidden>
     <h2>Match not found</h2>
@@ -83,7 +89,7 @@ foreach ($categoryLabels as $k => $label) {
 
     <div class="arena-foot">
       <span>Tap a photo to vote. Keyboard: <span class="kbd">1</span> / <span class="kbd">←</span> left, <span class="kbd">2</span> / <span class="kbd">→</span> right.</span>
-      <span><button class="link-btn" type="button" data-lp-reset>Reset votes</button> · <button class="link-btn danger" type="button" data-lp-delete>Delete match</button></span>
+      <span><span class="muted">Match ID <code data-lp-id></code></span> · <a href="<?= e(url('/report')) ?>">Report</a> · <button class="link-btn" type="button" data-lp-reset>Reset votes</button> · <button class="link-btn danger" type="button" data-lp-delete>Delete match</button></span>
     </div>
   </div>
 </div>

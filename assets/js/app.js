@@ -614,42 +614,48 @@
       img.src = src;
     });
   }
-  function importShared(packed, code) {
+  function blockedIds(node) {
+    try { return JSON.parse((node && node.dataset.blocked) || '[]'); } catch (e) { return []; }
+  }
+  /** Turn a validated payload object into a stored-match shape. */
+  function matchFromData(d, id, isPrivate, code) {
+    return { id: id, v: 1, created: Date.now(), title: clip(d.t, 120) || 'Shared match', category: clip(d.c, 32),
+      custom: clip(d.cc, 40), description: clip(d.d, 600), instructions: clip(d.i, 300),
+      people: d.p.map(function (p, i) { return { id: 'p' + i, name: clip(p.n, 40) || 'Contender ' + (i + 1), img: safeImg(p.g) }; }),
+      wins: {}, losses: {}, pairs: {}, round: 1, seen: {}, mine: false,
+      private: isPrivate, code: isPrivate ? String(code) : undefined };
+  }
+  /** Decrypt if needed, size-cap, parse and check every photo. Saves nothing. */
+  function decodeShared(packed, code) {
     var text, isPrivate = packed.charAt(0) === 'e';
     if (packed.length > 6000000) return Promise.reject(new Error('invalid'));
     return (isPrivate ? decryptText(packed, code || '') : Promise.resolve(packed)).then(unpackText).then(function (t) {
       text = t;
       var d = JSON.parse(t);
       if (!d || d.v !== 1 || !Array.isArray(d.p) || d.p.length < 2 || d.p.length > 20) throw new Error('invalid');
-      var people = d.p.map(function (p, i) { return { id: 'p' + i, name: clip(p && p.n, 40) || 'Contender ' + (i + 1), img: safeImg(p && p.g) }; });
-      if (people.some(function (p) { return !p.img; })) throw new Error('invalid');
-      return Promise.all(people.map(function (p) { return checkImage(p.img); })).then(function () { return d; });
-    }).then(function (d) {
-      var people = d.p.map(function (p, i) { return { id: 'p' + i, name: clip(p.n, 40) || 'Contender ' + (i + 1), img: safeImg(p.g) }; });
-      return digestId(text).then(function (id) {
-        return lget(id).then(function (existing) {
-          if (existing) return id;
-          return lput({ id: id, v: 1, created: Date.now(), title: clip(d.t, 120) || 'Shared match', category: clip(d.c, 32),
-            custom: clip(d.cc, 40), description: clip(d.d, 600), instructions: clip(d.i, 300), people: people,
-            wins: {}, losses: {}, pairs: {}, round: 1, seen: {}, mine: false,
-            private: isPrivate, code: isPrivate ? String(code) : undefined }).then(function () { return id; });
-        });
-      });
+      if (d.p.some(function (p) { return !safeImg(p && p.g); })) throw new Error('invalid');
+      return Promise.all(d.p.map(function (p) { return checkImage(p.g); })).then(function () { return digestId(text); });
+    }).then(function (id) { return { id: id, match: matchFromData(JSON.parse(text), id, isPrivate, code), isPrivate: isPrivate }; });
+  }
+  function importShared(packed, code, blocked) {
+    return decodeShared(packed, code).then(function (r) {
+      if ((blocked || []).indexOf(r.id) >= 0) throw new Error('blocked');
+      return lget(r.id).then(function (existing) { return existing ? r.id : lput(r.match).then(function () { return r.id; }); });
     });
   }
-
   /* ---------- play page ---------- */
   var lp = $('[data-local-play]');
   if (lp) initLocalPlay(lp);
 
   function initLocalPlay(root) {
     var cats = {}; try { cats = JSON.parse(root.dataset.cats || '{}'); } catch (e) {}
+    var blocked = blockedIds(root);
     var q = function (s) { return $(s, root); }, m = null, current = null, busy = false, last = '';
     var hash = new URLSearchParams(location.hash.slice(1));
 
     var shared = hash.get('s') || '';
     var openShared = function (code) {
-      return importShared(shared, code).then(function (id) {
+      return importShared(shared, code, blocked).then(function (id) {
         history.replaceState(null, '', location.pathname + '#id=' + encodeURIComponent(id));
         return lget(id);
       });
@@ -664,7 +670,10 @@
         lockErr.textContent = 'Checking…';
         openShared(lock.code.value).then(function (match) {
           lock.hidden = true; m = match; q('[data-lp-main]').hidden = false; renderHeader(); showArena();
-        }).catch(function () { lockErr.textContent = 'That code doesn’t open this match. Check it and try again.'; });
+        }).catch(function (ex) {
+          if (ex && ex.message === 'blocked') { lock.hidden = true; q('[data-lp-blocked]').hidden = false; return; }
+          lockErr.textContent = 'That code doesn’t open this match. Check it and try again.';
+        });
       });
       lock.code.focus();
       return wireControls();
@@ -674,9 +683,11 @@
     load.then(function (match) {
       q('[data-lp-loading]').hidden = true;
       if (!match) { q('[data-lp-missing]').hidden = false; return; }
+      if (blocked.indexOf(match.id) >= 0) { q('[data-lp-blocked]').hidden = false; return; }
       m = match; q('[data-lp-main]').hidden = false; renderHeader(); showArena();
-    }).catch(function () {
-      q('[data-lp-loading]').hidden = true; q('[data-lp-missing]').hidden = false;
+    }).catch(function (ex) {
+      q('[data-lp-loading]').hidden = true;
+      q(ex && ex.message === 'blocked' ? '[data-lp-blocked]' : '[data-lp-missing]').hidden = false;
     });
 
     function catInfo() {
@@ -693,6 +704,7 @@
       var ci = catInfo();
       document.title = m.title + ' | XEVION FaceMatch';
       q('[data-lp-title]').textContent = m.title;
+      q('[data-lp-id]').textContent = m.id;
       q('[data-lp-cat]').textContent = ci.label;
       q('[data-lp-prompt]').textContent = ci.prompt;
     }
@@ -836,7 +848,8 @@
     var labels = {}; try { labels = JSON.parse(listRoot.dataset.labels || '{}'); } catch (e) {}
     lall().then(function (items) {
       var cat = listRoot.dataset.category;
-      items = items.filter(function (m) { return !cat || m.category === cat; }).sort(function (a, b) { return b.created - a.created; });
+      var blockedList = blockedIds(listRoot);
+      items = items.filter(function (m) { return (!cat || m.category === cat) && blockedList.indexOf(m.id) < 0; }).sort(function (a, b) { return b.created - a.created; });
       if (!items.length) { $('[data-local-empty]').hidden = false; return; }
       items.forEach(function (m) {
         var a = el('a', 'match-card'); a.href = siteUrl('/play') + '#id=' + encodeURIComponent(m.id);
@@ -861,5 +874,101 @@
         listRoot.appendChild(a);
       });
     }).catch(function () { $('[data-local-empty]').hidden = false; });
+  }
+
+  /* ---------- admin dashboard without a database ---------- */
+  var adminLite = $('[data-admin-lite]');
+  if (adminLite) initAdminLite(adminLite);
+
+  function initAdminLite(root) {
+    var note = $('[data-lite-note]', root), rowsEl = $('[data-lite-rows]', root);
+    function renderRows() {
+      lall().then(function (items) {
+        rowsEl.textContent = '';
+        $('[data-lite-empty]', root).hidden = items.length > 0;
+        items.sort(function (a, b) { return b.created - a.created; }).forEach(function (m) {
+          var tr = el('tr'), votes = Object.keys(m.wins || {}).reduce(function (n, k) { return n + m.wins[k]; }, 0);
+          var td = el('td'), a = el('a', null, m.title); a.href = siteUrl('/play') + '#id=' + encodeURIComponent(m.id);
+          td.appendChild(a); if (m.private) td.appendChild(el('span', 'pill pill-private', 'Private')); tr.appendChild(td);
+          tr.appendChild(el('td', null, String(m.people.length)));
+          tr.appendChild(el('td', null, String(votes)));
+          var idTd = el('td'); idTd.appendChild(el('code', null, m.id)); tr.appendChild(idTd);
+          var act = el('td'), del = el('button', 'btn btn-danger btn-sm', 'Delete'); del.type = 'button';
+          del.addEventListener('click', function () {
+            if (!window.confirm('Delete “' + m.title + '” from this browser?')) return;
+            ldel(m.id).then(renderRows);
+          });
+          act.appendChild(del); tr.appendChild(act);
+          rowsEl.appendChild(tr);
+        });
+      }).catch(function () { note.textContent = 'This browser cannot open its match storage.'; });
+    }
+    renderRows();
+
+    // Backup: a JSON file with the matches as stored (photos included).
+    $('[data-lite-export]', root).addEventListener('click', function () {
+      lall().then(function (items) {
+        var blob = new Blob([JSON.stringify({ app: 'xevion-facematch', v: 1, exported: new Date().toISOString(), matches: items })], { type: 'application/json' });
+        var a = el('a'); a.href = URL.createObjectURL(blob); a.download = 'facematch-backup-' + new Date().toISOString().slice(0, 10) + '.json';
+        document.body.appendChild(a); a.click(); a.remove(); setTimeout(function () { URL.revokeObjectURL(a.href); }, 2000);
+        note.textContent = items.length + (items.length === 1 ? ' match' : ' matches') + ' saved to a file.';
+      });
+    });
+    // Restore: every match is re-validated like a share link before it is stored.
+    $('[data-lite-import]', root).addEventListener('change', function (e) {
+      var file = e.target.files && e.target.files[0];
+      if (!file) return;
+      if (file.size > 60 * 1048576) { note.textContent = 'That file is too large.'; return; }
+      note.textContent = 'Checking the backup…';
+      file.text().then(function (txt) {
+        var d = JSON.parse(txt);
+        if (!d || d.app !== 'xevion-facematch' || !Array.isArray(d.matches)) throw new Error('not a FaceMatch backup');
+        return Promise.all(d.matches.slice(0, 500).map(function (m) {
+          if (!m || !/^[a-z0-9]{6,40}$/.test(String(m.id)) || !Array.isArray(m.people) || m.people.length < 2 || m.people.length > 20) return false;
+          var people = m.people.map(function (p, i) { return { id: 'p' + i, name: clip(p && p.name, 40) || 'Contender ' + (i + 1), img: safeImg(p && p.img) }; });
+          if (people.some(function (p) { return !p.img; })) return false;
+          return Promise.all(people.map(function (p) { return checkImage(p.img); })).then(function () {
+            var clean = { id: String(m.id), v: 1, created: +m.created || Date.now(), title: clip(m.title, 120) || 'Match', category: clip(m.category, 32),
+              custom: clip(m.custom, 40), description: clip(m.description, 600), instructions: clip(m.instructions, 300), people: people,
+              wins: {}, losses: {}, pairs: {}, round: 1, seen: {}, mine: !!m.mine, private: !!m.private, code: m.private ? clip(m.code, 24) : undefined };
+            return lput(clean).then(function () { return true; });
+          }).catch(function () { return false; });
+        }));
+      }).then(function (res) {
+        var ok = res.filter(Boolean).length;
+        note.textContent = ok + ' restored' + (res.length - ok ? ', ' + (res.length - ok) + ' skipped because they failed checks' : '') + '. Votes are not restored.';
+        renderRows();
+      }).catch(function (ex) { note.textContent = 'Could not restore: ' + (ex && ex.message ? ex.message : 'invalid file') + '.'; });
+      e.target.value = '';
+    });
+
+    // Moderation: decode a reported link here, without saving it.
+    var form = $('[data-lite-inspect]', root), out = $('[data-lite-result]', root), blocked = blockedIds(root);
+    form.addEventListener('submit', function (e) {
+      e.preventDefault();
+      out.hidden = false; out.textContent = 'Opening the link…';
+      var link = form.link.value, at = link.indexOf('#s=');
+      if (at < 0) { out.textContent = 'That is not a FaceMatch share link (it should contain “#s=”).'; return; }
+      decodeShared(decodeURIComponent(link.slice(at + 3)), form.code.value).then(function (r) {
+        var m = r.match;
+        out.textContent = '';
+        out.appendChild(el('h3', null, m.title));
+        var meta = el('p', 'muted small');
+        meta.appendChild(document.createTextNode('Match ID '));
+        meta.appendChild(el('code', null, r.id));
+        meta.appendChild(document.createTextNode(' · ' + (r.isPrivate ? 'private' : 'public link') + ' · ' + m.people.length + ' contenders' + (blocked.indexOf(r.id) >= 0 ? ' · already blocked' : '')));
+        out.appendChild(meta);
+        if (m.description) out.appendChild(el('p', null, m.description));
+        var grid = el('div', 'lite-faces');
+        m.people.forEach(function (p) {
+          var fig = el('figure'), img = el('img'); img.src = p.img; img.alt = ''; fig.appendChild(img);
+          fig.appendChild(el('figcaption', null, p.name)); grid.appendChild(fig);
+        });
+        out.appendChild(grid);
+        out.appendChild(el('p', 'small muted', 'To block it, add ' + r.id + ' to BLOCKED_MATCHES in Vercel and redeploy.'));
+      }).catch(function () {
+        out.textContent = form.link.value.indexOf('#s=e') >= 0 ? 'This private link needs the right access code.' : 'This link is damaged or not a valid FaceMatch match.';
+      });
+    });
   }
 })();

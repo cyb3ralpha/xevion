@@ -33,6 +33,20 @@ What this mode cannot do, because there is nowhere shared to keep data:
 - Share links with many photos are long; some chat apps shorten or cut very long links.
 - There is no public listing of other people's matches, no moderation, no admin dashboard, no reports or contact form, and no ads. Those pages say they are not available.
 
+### Admin dashboard without a database
+
+`/admin/` stays switched off (it shows setup steps) until you add these in **Project → Settings → Environment Variables** and redeploy. See `.env.example`:
+
+| Variable | Purpose |
+|---|---|
+| `ADMIN_EMAIL` | Sign-in email |
+| `ADMIN_PASSWORD_HASH` or `ADMIN_PASSWORD` | bcrypt hash (preferred), or a plain password of 12+ characters |
+| `APP_SECRET` | Optional; signs admin sessions so they survive password changes |
+| `CONTACT_EMAIL` | Optional; shown on the Contact and Report pages |
+| `BLOCKED_MATCHES` | Optional; comma-separated match IDs that must no longer open on the site |
+
+The dashboard offers **Status** (this deployment's details), **Moderation** (paste a reported share link to see its content and ID; block it by adding the ID to `BLOCKED_MATCHES`) and **Matches in this browser** (list, delete, back up to a file, restore). It cannot see or delete matches on other people's devices.
+
 To get shared results, accounts for admins and everything else, connect a MySQL database as described below. The site switches to the full version automatically.
 ## 1. Create a MySQL database
 

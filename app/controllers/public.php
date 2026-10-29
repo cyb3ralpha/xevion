@@ -775,6 +775,8 @@ function page_contact(): void
 function page_play_local(): void
 {
     render('local_play', [
+        'blocked' => blocked_matches(),
+        'email' => site_contact_email(),
         'title' => 'Play a match',
         'categoryPrompts' => array_map(static fn($c) => $c['prompt'], categories()),
         'categoryLabels' => array_map(static fn($c) => $c['label'], categories()),
@@ -790,10 +792,23 @@ function page_local_list(?string $category = null): void
         not_found();
     }
     render('local_list', [
+        'blocked' => blocked_matches(),
         'title' => $category ? category_label(['category' => $category]) . ' matches' : 'Your matches',
         'fixedCategory' => $category,
         'categoryLabels' => array_map(static fn($c) => $c['label'], categories()),
     ]);
+}
+
+/** Without a database: contact details instead of a stored contact form. */
+function page_local_contact(): void
+{
+    render('local_contact', ['title' => 'Contact', 'kind' => 'contact', 'email' => site_contact_email()]);
+}
+
+/** Without a database: how to report a match (by share link or match ID). */
+function page_local_report(): void
+{
+    render('local_contact', ['title' => 'Report a match', 'kind' => 'report', 'email' => site_contact_email(), 'noindex' => true]);
 }
 
 /** Shown for features that must store data when the site runs without a database. */

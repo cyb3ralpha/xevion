@@ -50,10 +50,10 @@ $withoutDb = [
     'page_home' => true, 'page_create' => true, 'page_privacy' => true, 'page_terms' => true, 'page_play_local' => true,
 ];
 // Pages that have a browser-storage version when there is no database.
-$deviceVersion = ['page_explore' => 'page_local_list', 'page_category' => 'page_local_list'];
+$deviceVersion = ['page_explore' => 'page_local_list', 'page_category' => 'page_local_list',
+    'page_contact' => 'page_local_contact', 'page_report' => 'page_local_report'];
 $unavailable = [
-    'page_created' => 'Creating matches', 'page_report' => 'Reporting',
-    'page_contact' => 'The contact form', 'api_next' => 'Voting', 'api_vote' => 'Voting',
+    'page_created' => 'Creating matches', 'api_next' => 'Voting', 'api_vote' => 'Voting',
 ];
 
 foreach ($routes as $pattern => $handler) {

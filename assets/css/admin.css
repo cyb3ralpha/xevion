@@ -53,3 +53,22 @@ a.stat:hover { border-color: var(--x-blue); }
   .admin-main { padding: 18px 16px 48px; }
 }
 .admin-main h2 { font-size: 1.15rem; }
+
+/* admin without a database (templates/admin/lite.php) */
+.lite-top { position: sticky; top: 0; z-index: 20; display: flex; align-items: center; gap: 18px; flex-wrap: wrap; padding: 12px 20px; background: rgba(12,7,39,.94); border-bottom: 1px solid var(--x-line-soft); backdrop-filter: blur(10px); }
+.lite-top .brand { margin-right: auto; }
+.lite-tabs { display: flex; gap: 4px; flex-wrap: wrap; }
+.lite-tabs a { display: inline-flex; align-items: center; gap: 6px; padding: 8px 12px; border-radius: var(--r-sm); color: var(--x-text); text-decoration: none; font-weight: 500; font-size: .92rem; }
+.lite-tabs a:hover { background: var(--x-panel); color: #fff; }
+.lite-main { display: grid; gap: 20px; padding-top: 24px; padding-bottom: 48px; }
+.lite-main h2 { display: flex; align-items: center; gap: 10px; font-size: 1.3rem; }
+.lite-main h2 .icon { color: var(--x-blue-hi); }
+.lite-main .tbl th[scope="row"] { width: 34%; color: var(--x-muted); font-weight: 500; }
+.lite-main section { scroll-margin-top: 80px; }
+.lite-result { margin-top: 18px; padding: 18px; border-radius: var(--r-md); border: 1px solid var(--x-line); background: var(--x-navy-2); }
+.lite-faces { display: grid; grid-template-columns: repeat(auto-fill, minmax(110px, 1fr)); gap: 10px; margin: 12px 0; }
+.lite-faces figure { margin: 0; }
+.lite-faces img { width: 100%; aspect-ratio: 4/5; object-fit: cover; border-radius: 8px; }
+.lite-faces figcaption { font-size: .85rem; margin-top: 4px; }
+.lite-list { padding-left: 18px; }
+@media (max-width: 640px) { .lite-top { gap: 10px; } .lite-tabs a { padding: 6px 8px; font-size: .85rem; } }

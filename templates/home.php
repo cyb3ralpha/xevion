@@ -62,7 +62,7 @@ $lists = [
     <div class="section-head" data-reveal><div><h2>How it works</h2><p>Three steps, about a minute.</p></div></div>
     <ol class="how">
       <li data-reveal style="--d:0"><span class="how-icon"><?= icon('image') ?></span><h3>Add the contenders</h3><p>A photo and a nickname for each person or team, from 2 up to <?= e(setting_int('max_participants', 20)) ?>. Only add people who agreed to take part.</p></li>
-      <li data-reveal style="--d:1"><span class="how-icon"><?= icon('link') ?></span><h3>Share the link</h3><p>Public matches appear in Explore after a quick review. Private matches open only through your invite link.</p></li>
+      <li data-reveal style="--d:1"><span class="how-icon"><?= icon('link') ?></span><h3>Share the link</h3><p><?= db_enabled() ? 'Public matches appear in Explore after a quick review. Private matches open only through your invite link.' : 'Send the link to friends. Choose a private match and it only opens with the access code you give them.' ?></p></li>
       <li data-reveal style="--d:2"><span class="how-icon"><?= icon('bolt') ?></span><h3>Vote head-to-head</h3><p>Voters see two photos at a time and tap a pick. Rankings come from each contender’s win rate across all matchups.</p></li>
     </ol>
   </div>
