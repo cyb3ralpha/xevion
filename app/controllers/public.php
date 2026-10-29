@@ -26,6 +26,7 @@ function page_home(): void
         'recent' => $recent,
         'categoryCounts' => $db ? category_counts() : [],
         'isEmpty' => !$featured && !$trending && !$recent,
+        'serverStore' => !$db && short_links_enabled(),
         'bodyClass' => 'page-home',
     ]);
 }
@@ -120,6 +121,7 @@ function page_create(): void
         'maxP' => setting_int('max_participants', 20),
         'maxMb' => setting_int('max_upload_mb', 5),
         'local' => !db_enabled(),
+        'serverStore' => !db_enabled() && short_links_enabled(),
         'bodyClass' => 'page-create',
     ]);
 }
@@ -775,13 +777,71 @@ function page_contact(): void
         'contactEmail' => (string)setting('contact_email', '')]);
 }
 
-/** Without a database: play and see results for a match saved in this browser (or opened from a share link). */
-function page_play_local(): void
+/**
+ * True when Vercel Blob is connected (no database). Matches are then stored on the server
+ * through api/share.js: public ones are listed on the site, private ones open only by link.
+ */
+function short_links_enabled(): bool
 {
+    return env_value('BLOB_READ_WRITE_TOKEN') !== '';
+}
+
+/**
+ * Title and description for a short link's preview card (WhatsApp, iMessage, Slack...).
+ * Reads the stored match through /api/share; private matches are encrypted, so they
+ * only get a generic card. Returns null when the match can't be read.
+ */
+function short_link_preview(string $id): ?array
+{
+    if (!short_links_enabled() || !function_exists('curl_init')) {
+        return null;
+    }
+    $origin = request_origin();
+    if ($origin === '') {
+        return null;
+    }
+    $ch = curl_init($origin . '/api/share?id=' . rawurlencode($id));
+    curl_setopt_array($ch, [CURLOPT_RETURNTRANSFER => true, CURLOPT_TIMEOUT => 4, CURLOPT_CONNECTTIMEOUT => 2, CURLOPT_MAXFILESIZE => 4 * 1048576]);
+    $body = curl_exec($ch);
+    $code = (int)curl_getinfo($ch, CURLINFO_RESPONSE_CODE);
+    curl_close($ch);
+    if ($code === 410) {
+        return ['blocked' => true];
+    }
+    if ($code !== 200 || !is_string($body) || $body === '') {
+        return null;
+    }
+    if ($body[0] === 'e') {
+        return ['title' => 'Private match', 'desc' => 'A private photo face-off on XEVION FaceMatch. You need the access code from the organiser to open it.'];
+    }
+    $raw = base64_decode(strtr(substr($body, 1), '-_', '+/'), true);
+    $json = $raw === false ? false : ($body[0] === 'z' ? @gzinflate($raw, 8 * 1048576) : $raw);
+    $d = is_string($json) ? json_decode($json, true) : null;
+    if (!is_array($d) || !isset($d['t'], $d['p']) || !is_array($d['p'])) {
+        return null;
+    }
+    $prompt = trim((string)($d['i'] ?? '')) ?: (categories()[(string)($d['c'] ?? '')]['prompt'] ?? 'Pick a winner');
+    return [
+        'title' => mb_substr(trim((string)$d['t']), 0, 90),
+        'desc' => mb_substr($prompt, 0, 120) . ' Vote on ' . count($d['p']) . ' contenders in this face-off on XEVION FaceMatch.',
+    ];
+}
+
+/** Without a database: play a match stored on the server (/s/{id}), in this browser, or carried in a share link. */
+function page_play_local(?string $shortId = null): void
+{
+    $preview = $shortId !== null ? short_link_preview($shortId) : null;
+    $blockedIds = blocked_matches();
+    if ($shortId !== null && (in_array(strtolower($shortId), $blockedIds, true) || !empty($preview['blocked']))) {
+        $blockedIds[] = strtolower($shortId);
+    }
     render('local_play', [
-        'blocked' => blocked_matches(),
+        'blocked' => array_values(array_unique($blockedIds)),
         'email' => site_contact_email(),
-        'title' => 'Play a match',
+        'shortId' => $shortId,
+        'shortEnabled' => short_links_enabled(),
+        'title' => $preview['title'] ?? 'Play a match',
+        'metaDescription' => $preview['desc'] ?? null,
         'categoryPrompts' => array_map(static fn($c) => $c['prompt'], categories()),
         'categoryLabels' => array_map(static fn($c) => $c['label'], categories()),
         'noindex' => true,
@@ -797,8 +857,9 @@ function page_local_list(?string $category = null): void
     }
     render('local_list', [
         'blocked' => blocked_matches(),
-        'title' => $category ? category_label(['category' => $category]) . ' matches' : 'Your matches',
+        'title' => $category ? category_label(['category' => $category]) . ' matches' : (short_links_enabled() ? 'Explore matches' : 'Your matches'),
         'fixedCategory' => $category,
+        'serverStore' => short_links_enabled(),
         'categoryLabels' => array_map(static fn($c) => $c['label'], categories()),
     ]);
 }

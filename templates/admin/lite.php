@@ -64,13 +64,13 @@
       <h2><?= icon('shield') ?> Moderation</h2>
       <p class="muted">Paste a share link someone reported. It is opened here in your browser only, so you can see what it contains and get its match ID.</p>
       <form class="form-stack" data-lite-inspect>
-        <label class="field"><span>Share link</span><input type="url" name="link" required placeholder="https://…/play#s=…"></label>
+        <label class="field"><span>Share link</span><input type="url" name="link" required placeholder="https://www.xevion.pk/s/… or …/play#s=…"></label>
         <label class="field"><span>Access code <span class="hint">Only for private links</span></span><input type="text" name="code" autocomplete="off"></label>
         <div class="btn-row"><button class="btn btn-primary btn-sm" type="submit"><?= icon('search') ?> Inspect</button></div>
       </form>
       <div data-lite-result class="lite-result" hidden></div>
       <h3 style="margin-top:24px">Blocked matches</h3>
-      <p class="muted small">To block a match, add its ID to the <code>BLOCKED_MATCHES</code> environment variable in Vercel (IDs separated by commas) and redeploy. Blocked matches no longer open on this site and disappear from visitors’ lists. Copies already saved on someone’s device can’t be deleted remotely.</p>
+      <p class="muted small">To block a match, add its ID (for short links, the code after <code>/s/</code>) to the <code>BLOCKED_MATCHES</code> environment variable in Vercel (IDs separated by commas) and redeploy. Blocked matches no longer open on this site and disappear from visitors’ lists. Copies already saved on someone’s device can’t be deleted remotely.</p>
       <?php if ($blocked): ?>
         <ul class="lite-list"><?php foreach ($blocked as $id): ?><li><code><?= e($id) ?></code></li><?php endforeach; ?></ul>
       <?php else: ?><p class="muted small">No matches are blocked.</p><?php endif; ?>

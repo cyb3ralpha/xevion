@@ -8,3 +8,4 @@ storage/installed.lock
 .env
 .env.*
 !.env.example
+node_modules/

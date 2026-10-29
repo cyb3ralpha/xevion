@@ -24,7 +24,7 @@ $local = !empty($local); // no database: the match is saved in this browser
       <?php if ($pe || !empty($errors['participants'])): ?><br>Photos can’t be kept between attempts, so choose them again for each contender.<?php endif; ?>
     </div>
   <?php endif; ?>
-  <form method="post" action="<?= e(url('/create')) ?>" enctype="multipart/form-data" class="create-steps <?= e($formClass) ?>" data-create-form<?= $local ? ' data-local' : '' ?>
+  <form method="post" action="<?= e(url('/create')) ?>" enctype="multipart/form-data" class="create-steps <?= e($formClass) ?>" data-create-form<?= $local ? ' data-local' : '' ?><?= !empty($serverStore) ? ' data-server="1"' : '' ?>
         data-min="<?= (int)$minP ?>" data-max="<?= (int)$maxP ?>" data-max-mb="<?= (int)$maxMb ?>" novalidate>
     <?= csrf_field() ?>
     <input type="hidden" name="tz_offset" value="0" data-tz>
@@ -89,11 +89,15 @@ $local = !empty($local); // no database: the match is saved in this browser
     <section class="card pad">
       <div class="step-title"><span class="n">3</span><h2>Who can open it</h2></div>
       <div class="choice-row" role="radiogroup" aria-label="Who can open the match">
-        <div class="choice"><input type="radio" id="lv-link" name="local_visibility" value="link" checked><label for="lv-link"><strong>Anyone with the link</strong><span>Share the link and friends can vote straight away.</span></label></div>
-        <div class="choice"><input type="radio" id="lv-code" name="local_visibility" value="code"><label for="lv-code"><strong>Private, with an access code</strong><span>The link is encrypted. People also need the code you send them separately.</span></label></div>
+        <div class="choice"><input type="radio" id="lv-link" name="local_visibility" value="link" checked><label for="lv-link"><strong><?= !empty($serverStore) ? 'Public' : 'Anyone with the link' ?></strong><span><?= !empty($serverStore) ? 'Listed on the website for everyone to vote on, and shareable by link.' : 'Share the link and friends can vote straight away.' ?></span></label></div>
+        <div class="choice"><input type="radio" id="lv-code" name="local_visibility" value="code"><label for="lv-code"><strong>Private, with an access code</strong><span><?= !empty($serverStore) ? 'Not listed anywhere. It opens only through its link plus the code you send separately.' : 'The link is encrypted. People also need the code you send them separately.' ?></span></label></div>
       </div>
       <ul class="trust trust-stack" style="margin-top:16px">
+        <?php if (!empty($serverStore)): ?>
+        <li><?= icon('lock') ?> The match is saved on our server. Private matches are encrypted in your browser first, so only people with the code can open them.</li>
+        <?php else: ?>
         <li><?= icon('lock') ?> The match and its photos are saved only in this browser, never on our servers.</li>
+        <?php endif; ?>
         <li><?= icon('chart') ?> Each device keeps its own results. Pass one phone around to vote together.</li>
       </ul>
     </section>

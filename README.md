@@ -10,7 +10,7 @@ Plain PHP 8.1+, no framework, no Composer or npm packages and no build step.
 |---|---|---|
 | Create, vote, results | In the visitor's browser | On the server |
 | Photos | Resized in the browser, kept in browser storage and inside share links. Never uploaded | Uploaded, re-encoded and stored in `media/uploads/` (or MySQL on Vercel) |
-| Sharing | Link carries the match; **private** matches use an encrypted link plus an access code | Public listing after review, or unguessable invite links with optional code |
+| Sharing | Short `/s/…` links when Vercel Blob is connected, otherwise a link that carries the match; **private** matches are encrypted and need an access code | Public listing after review, or unguessable invite links with optional code |
 | Results | Per device, never combined across people | Combined for everyone, with duplicate-vote limits |
 | Admin dashboard | Status, moderation by share link (block list), matches in the admin's browser, backups | Full: matches, photos, reports, ads, administrators, settings |
 | Explore, reports, ads | Explore lists the device's own matches; reports go by email | Full |
@@ -32,7 +32,8 @@ Import the GitHub repository into Vercel and keep the defaults; `vercel.json` se
 
 ```
 ├── index.php, admin/index.php   Front controllers (public site, admin)
-├── api/                         Vercel entry point and PHP settings
+├── api/                         Vercel entry point, PHP settings, short-link function (share.js)
+├── package.json                 Only for api/share.js (@vercel/blob)
 ├── app/                         Application code (never served)
 ├── assets/                      CSS, JavaScript, fonts
 ├── config/                      config.php for database mode (git-ignored)

@@ -43,6 +43,7 @@ $routes = [
     '#^/privacy$#'                            => 'page_privacy',
     '#^/terms$#'                              => 'page_terms',
     '#^/play$#'                               => 'page_play_local',
+    '#^/s/([A-Za-z0-9]{10})$#'                => 'page_play_local',
 ];
 
 // Without a database only pages that store nothing run; the rest explain what is missing.

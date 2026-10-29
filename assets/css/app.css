@@ -151,6 +151,8 @@ input:focus, select:focus, textarea:focus { outline: none; border-color: var(--x
 .notice-success { border-color: rgba(54,211,153,.45); background: rgba(54,211,153,.08); }
 .notice-error { border-color: rgba(255,92,122,.5); background: rgba(255,92,122,.08); }
 .notice-info { border-color: rgba(24,140,241,.45); background: rgba(24,140,241,.08); }
+.list-head { font-size: 1.15rem; margin: 28px 0 14px; }
+.list-head:first-child { margin-top: 8px; }
 .notice-warn { border-color: rgba(245,184,65,.5); background: rgba(245,184,65,.08); }
 .flash-stack { margin-top: 18px; }
 

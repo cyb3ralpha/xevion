@@ -181,6 +181,7 @@ function admin_lite(string $route): void
         'PHP' => PHP_VERSION,
         'HTTPS' => is_https() ? 'Yes' : 'No',
         'Contact email' => site_contact_email() !== '' ? site_contact_email() : 'Not set (CONTACT_EMAIL)',
+        'Short links' => env_value('BLOB_READ_WRITE_TOKEN') !== '' ? 'On (Vercel Blob connected)' : 'Off — connect a Vercel Blob store to get /s/… links',
         'Blocked matches' => (string)count(blocked_matches()),
         'Signing key' => strlen(env_value('APP_SECRET')) >= 32 ? 'APP_SECRET' : 'Derived from the admin password (set APP_SECRET to keep sessions across password changes)',
     ];

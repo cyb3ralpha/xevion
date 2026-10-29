@@ -1,29 +1,45 @@
 {
-  "$schema": "https://openapi.vercel.sh/vercel.json",
-  "functions": {
-    "api/index.php": {
-      "runtime": "vercel-php@0.8.0",
-      "maxDuration": 30
-    }
-  },
-  "routes": [
-    {
-      "src": "/assets/(.+\\.(?:css|js|woff2|png|jpg|webp|svg))",
-      "headers": {
-        "Cache-Control": "public, max-age=2592000",
-        "X-Content-Type-Options": "nosniff"
-      },
-      "dest": "/assets/$1"
+    "$schema": "https://openapi.vercel.sh/vercel.json",
+    "functions": {
+        "api/index.php": {
+            "runtime": "vercel-php@0.8.0",
+            "maxDuration": 30
+        }
     },
-    {
-      "src": "/media/brand/(.+\\.(?:png|jpg))",
-      "headers": { "Cache-Control": "public, max-age=2592000", "X-Content-Type-Options": "nosniff" },
-      "dest": "/media/brand/$1"
-    },
-    { "src": "/robots.txt", "dest": "/robots.txt" },
-    { "src": "/(.*)", "dest": "/api/index.php" }
-  ],
-  "crons": [
-    { "path": "/api/cron", "schedule": "0 4 * * *" }
-  ]
+    "routes": [
+        {
+            "src": "/assets/(.+\\.(?:css|js|woff2|png|jpg|webp|svg))",
+            "headers": {
+                "Cache-Control": "public, max-age=2592000",
+                "X-Content-Type-Options": "nosniff"
+            },
+            "dest": "/assets/$1"
+        },
+        {
+            "src": "/media/brand/(.+\\.(?:png|jpg))",
+            "headers": {
+                "Cache-Control": "public, max-age=2592000",
+                "X-Content-Type-Options": "nosniff"
+            },
+            "dest": "/media/brand/$1"
+        },
+        {
+            "src": "/robots.txt",
+            "dest": "/robots.txt"
+        },
+        {
+            "src": "/api/share",
+            "dest": "/api/share"
+        },
+        {
+            "src": "/(.*)",
+            "dest": "/api/index.php"
+        }
+    ],
+    "crons": [
+        {
+            "path": "/api/cron",
+            "schedule": "0 4 * * *"
+        }
+    ]
 }

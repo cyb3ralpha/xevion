@@ -13,6 +13,9 @@ $navCurrent = static fn(string $p) => ($path === $p || ($p !== '/' && str_starts
 <?php if (!empty($noindex)): ?><meta name="robots" content="noindex, nofollow, noarchive"><?php endif; ?>
 <meta name="theme-color" content="#0C0727">
 <meta property="og:title" content="<?= e($title) ?>">
+<meta property="og:description" content="<?= e($metaDescription ?? 'Create photo face-offs, share them with friends and vote head-to-head.') ?>">
+<meta property="og:type" content="website">
+<meta name="twitter:card" content="summary">
 <meta property="og:site_name" content="XEVION FaceMatch">
 <meta property="og:image" content="<?= e(abs_url('/media/brand/og-mark-512.png')) ?>">
 <link rel="icon" type="image/png" sizes="32x32" href="<?= e(brand_img('favicon-32.png')) ?>">

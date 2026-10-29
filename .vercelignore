@@ -6,3 +6,4 @@ storage/logs/*
 docs/
 router.php
 CLAUDE.md
+node_modules/

@@ -68,8 +68,24 @@ function url(string $path = '/', array $query = []): string
 function abs_url(string $path = '/', array $query = []): string
 {
     $origin = rtrim((string)config('base_url', ''), '/');
-    $origin = preg_replace('#^(https?://[^/]+).*$#', '$1', $origin) ?: '';
+    $origin = preg_replace('#^(https?://[^/]+).*$#', '$1', $origin) ?: request_origin();
     return $origin . url($path, $query);
+}
+
+/**
+ * Scheme and host of the current request, e.g. https://www.xevion.pk. Behind a trusted
+ * proxy (Vercel) the visitor's host comes from X-Forwarded-Host. Empty if it looks odd.
+ */
+function request_origin(): string
+{
+    $host = (string)($_SERVER['HTTP_HOST'] ?? '');
+    if (config('trust_proxy') && !empty($_SERVER['HTTP_X_FORWARDED_HOST'])) {
+        $host = trim(explode(',', (string)$_SERVER['HTTP_X_FORWARDED_HOST'])[0]);
+    }
+    if (!preg_match('/^[A-Za-z0-9.-]+(:\d{1,5})?$/', $host)) {
+        return '';
+    }
+    return (is_https() ? 'https://' : 'http://') . strtolower($host);
 }
 
 /** URL of a static brand image in media/brand/ (cache-busted like asset()). */

@@ -1,0 +1,7 @@
+{
+  "private": true,
+  "description": "Only for api/share.js (short share links on Vercel). The site itself is plain PHP.",
+  "dependencies": {
+    "@vercel/blob": "2.8.2"
+  }
+}

@@ -5,7 +5,7 @@ foreach ($categoryLabels as $k => $label) {
     $cats[$k] = ['l' => $label, 'p' => $categoryPrompts[$k] ?? ''];
 }
 ?>
-<div class="container arena-wrap" data-local-play data-cats="<?= e(json_encode($cats, JSON_UNESCAPED_UNICODE)) ?>" data-blocked="<?= e(json_encode($blocked)) ?>">
+<div class="container arena-wrap" data-local-play data-cats="<?= e(json_encode($cats, JSON_UNESCAPED_UNICODE)) ?>" data-blocked="<?= e(json_encode($blocked)) ?>" data-short-id="<?= e((string)($shortId ?? '')) ?>" data-short-enabled="<?= !empty($shortEnabled) ? '1' : '' ?>">
   <div data-lp-loading class="arena-state card"><p class="muted">Loading the match…</p></div>
 
   <div data-lp-blocked class="arena-state card" hidden>
@@ -32,6 +32,7 @@ foreach ($categoryLabels as $k => $label) {
   </form>
 
   <div data-lp-main hidden>
+    <p class="notice notice-error" data-lp-upload-failed hidden>Your match is saved in this browser, but it couldn’t be uploaded to the website just now, so it isn’t listed yet. Press Share to try again.</p>
     <div class="arena-top">
       <div>
         <div class="pills"><span class="pill pill-cat" data-lp-cat></span><span class="pill pill-live" data-lp-round></span></div>

@@ -28,6 +28,7 @@ XEVION FaceMatch is a photo face-off site. Visitors create a match from 2 to 20 
 | `media/brand/`, `media/uploads/` | Brand images (originals in `media/brand/originals/`); database-mode uploads (git-ignored, never served) |
 | `database/schema.sql` | Idempotent schema (`CREATE TABLE IF NOT EXISTS`) |
 | `docs/` | `DEPLOYMENT.md`, `VERCEL.md`, `SECURITY.md`, `ADMIN.md`, `VOTING.md`; original logo files in `docs/brand/` |
+| `api/share.js`, `package.json` | Short share links: Node function storing packed matches in Vercel Blob (`@vercel/blob` 2.8.2); the only Node code |
 | `router.php` | Router for PHP's built-in server (`php -S localhost:8000 router.php`) |
 
 ## Local development (XAMPP on Windows)
@@ -104,6 +105,8 @@ Headless Chrome will not lay out narrower than 512px with `--window-size`. For r
 18. **Oct 29: stale browser cache.** On Vercel every deployed file has mtime 0, so `asset()` produced `?v=000000` forever and browsers kept a 30-day-cached old `app.js`; the owner's browser still ran pre-fix code, which posted the create form to the server, where it silently reloaded. Static URLs are now versioned by content (`file_version()`, MD5 prefix). A create POST without a database now shows "outdated version" guidance and keeps the typed fields instead of redirecting.
 
 19. **Oct 29: full live review.** Audited every page on desktop and phone (broken images, alt text, unnamed controls, unlabeled inputs, duplicate ids, h1 count, overflow, console errors, failed requests) and exercised every play-page control live (keyboard and tap voting, round complete, standings, next voter, share, copy, reset, delete). Fixes: play-page states use a real h1, home tab title no longer repeats the brand, the closing band and the Terms (moderation, your content) describe browser mode accurately, Copy falls back to execCommand, and keyboard hints are hidden on touch screens.
+
+20. **Oct 29: short share links.** Share now creates `/s/{10 chars}` links when Vercel Blob is connected (`BLOB_READ_WRITE_TOKEN`): `api/share.js` stores the packed match (private Blob, falls back to public stores), validates origin, size and structure, and returns 410 for `BLOCKED_MATCHES`. `/s/{id}` renders the play page, which fetches the match and continues like a `#s=` link (private ones still need the code). PHP builds a preview card (og:title/description from the match; "Private match" for encrypted ones) via `short_link_preview()`; `request_origin()` uses `X-Forwarded-Host` behind Vercel. Without Blob, Share falls back to the long link. Tested with a portable Node 26 and an in-memory `@vercel/blob` stand-in (17 handler checks) and in Chrome through a local relay (public, private, reuse, preview, blocking); not yet tested against real Vercel Blob.
 
 ## Known limits and open items
 

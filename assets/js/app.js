@@ -290,7 +290,12 @@
         e.preventDefault();
         btn.disabled = true; btn.textContent = 'Creating your match…';
         localCreateFromForm(form, rows()).then(function (id) {
-          location.href = siteUrl('/play') + '#id=' + encodeURIComponent(id);
+          if (form.dataset.server !== '1') { location.href = siteUrl('/play') + '#id=' + encodeURIComponent(id); return; }
+          // Server storage is on: upload the match now so its link works everywhere.
+          btn.textContent = 'Uploading your match…';
+          return lget(id).then(function (m) { return shareLinkFor(m, true); }).then(function (link) {
+            location.href = link.short ? link.url : siteUrl('/play') + '#id=' + encodeURIComponent(id) + '&upload=failed';
+          });
         }).catch(function (ex) {
           btn.disabled = false; btn.classList.remove('is-busy'); btn.textContent = 'Create match';
           err.textContent = 'The match could not be saved in this browser (' + (ex && ex.message ? ex.message : 'storage error') + '). Private browsing can block saving; try a normal window.';
@@ -605,6 +610,35 @@
       return crypto.subtle.decrypt({ name: 'AES-GCM', iv: all.slice(16, 28) }, key, all.slice(28));
     }).then(function (pt) { return new TextDecoder().decode(pt); });
   }
+  /** Store the packed match on the server and return its short /s/{id} URL. */
+  function createShortLink(packed) {
+    return fetch(siteUrl('/api/share'), {
+      method: 'POST', credentials: 'same-origin',
+      headers: { 'Content-Type': 'application/json', 'Accept': 'application/json' },
+      body: JSON.stringify({ payload: packed })
+    }).then(function (r) { return r.json().then(function (j) { if (!r.ok || !j.id) throw new Error(j.error || 'short link failed'); return j; }); });
+  }
+  /** Remove a match from the server (only the browser that uploaded it holds the delete key). */
+  function deleteServerCopy(m) {
+    if (!m.shortId || !m.shortKey) return Promise.resolve();
+    return fetch(siteUrl('/api/share'), {
+      method: 'POST', credentials: 'same-origin',
+      headers: { 'Content-Type': 'application/json', 'Accept': 'application/json' },
+      body: JSON.stringify({ action: 'delete', id: m.shortId, key: m.shortKey })
+    }).then(function (r) { if (!r.ok && r.status !== 404) throw new Error('delete failed'); });
+  }
+  /** Short link when the server offers them (reused once made), otherwise the self-contained long link. */
+  function shareLinkFor(m, shortEnabled) {
+    if (shortEnabled && m.shortId) return Promise.resolve({ url: location.origin + siteUrl('/s/' + m.shortId), short: true });
+    return shareUrlFor(m).then(function (longUrl) {
+      if (!shortEnabled) return { url: longUrl, short: false };
+      return createShortLink(longUrl.slice(longUrl.indexOf('#s=') + 3)).then(function (j) {
+        var id = j.id;
+        m.shortId = id; m.shortKey = j.key || undefined;
+        return lput(m).then(function () { return { url: location.origin + siteUrl('/s/' + id), short: true }; });
+      }).catch(function () { return { url: longUrl, short: false, fallback: true }; });
+    });
+  }
   function shareUrlFor(m) {
     return Promise.all(m.people.map(function (p) { return dataUrlToJpeg(p.img, 240, 300, 0.6); })).then(function (imgs) {
       var payload = { v: 1, t: m.title, c: m.category, cc: m.custom || '', d: m.description || '', i: m.instructions || '',
@@ -668,43 +702,57 @@
     var q = function (s) { return $(s, root); }, m = null, current = null, busy = false, last = '';
     var hash = new URLSearchParams(location.hash.slice(1));
 
-    var shared = hash.get('s') || '';
-    var openShared = function (code) {
-      return importShared(shared, code, blocked).then(function (id) {
-        history.replaceState(null, '', location.pathname + '#id=' + encodeURIComponent(id));
-        return lget(id);
-      });
-    };
-    if (shared.charAt(0) === 'e') {
-      // Private link: nothing can be read until the right access code is entered.
-      q('[data-lp-loading]').hidden = true;
-      var lock = q('[data-lp-locked]'), lockErr = q('[data-lp-locked-error]');
-      lock.hidden = false;
-      lock.addEventListener('submit', function (e) {
-        e.preventDefault();
-        lockErr.textContent = 'Checking…';
-        openShared(lock.code.value).then(function (match) {
-          lock.hidden = true; m = match; q('[data-lp-main]').hidden = false; renderHeader(); showArena();
-        }).catch(function (ex) {
-          if (ex && ex.message === 'blocked') { lock.hidden = true; q('[data-lp-blocked]').hidden = false; return; }
-          lockErr.textContent = 'That code doesn’t open this match. Check it and try again.';
-        });
-      });
-      lock.code.focus();
-      return wireControls();
-    }
-    var load = shared ? openShared('') : (hash.get('id') ? lget(hash.get('id')) : Promise.resolve(null));
-
-    load.then(function (match) {
+    var shortId = root.dataset.shortId || '', shortEnabled = root.dataset.shortEnabled === '1';
+    function showLoaded(match) {
       q('[data-lp-loading]').hidden = true;
       if (!match) { q('[data-lp-missing]').hidden = false; return; }
-      if (blocked.indexOf(match.id) >= 0) { q('[data-lp-blocked]').hidden = false; return; }
-      m = match; q('[data-lp-main]').hidden = false; renderHeader(); showArena();
-    }).catch(function (ex) {
+      if (blocked.indexOf(match.id) >= 0 || (shortId && blocked.indexOf(shortId.toLowerCase()) >= 0)) { q('[data-lp-blocked]').hidden = false; return; }
+      m = match;
+      if (shortId && m.shortId !== shortId) { m.shortId = shortId; lput(m); }   // Share reuses the same short link
+      if (hash.get('upload') === 'failed') q('[data-lp-upload-failed]').hidden = false;
+      q('[data-lp-main]').hidden = false; renderHeader(); showArena();
+    }
+    function showFailure(ex) {
       q('[data-lp-loading]').hidden = true;
       q(ex && ex.message === 'blocked' ? '[data-lp-blocked]' : '[data-lp-missing]').hidden = false;
-    });
-
+    }
+    function start(shared) {
+      var openShared = function (code) {
+        return importShared(shared, code, blocked).then(function (id) {
+          if (!shortId) history.replaceState(null, '', location.pathname + '#id=' + encodeURIComponent(id));
+          return lget(id);
+        });
+      };
+      if (shared.charAt(0) === 'e') {
+        // Private match: nothing can be read until the right access code is entered.
+        q('[data-lp-loading]').hidden = true;
+        var lock = q('[data-lp-locked]'), lockErr = q('[data-lp-locked-error]');
+        lock.hidden = false;
+        lock.addEventListener('submit', function (e) {
+          e.preventDefault();
+          lockErr.textContent = 'Checking…';
+          openShared(lock.code.value).then(function (match) { lock.hidden = true; showLoaded(match); }).catch(function (ex) {
+            if (ex && ex.message === 'blocked') { lock.hidden = true; q('[data-lp-blocked]').hidden = false; return; }
+            lockErr.textContent = 'That code doesn’t open this match. Check it and try again.';
+          });
+        });
+        lock.code.focus();
+        return;
+      }
+      (shared ? openShared('') : (hash.get('id') ? lget(hash.get('id')) : Promise.resolve(null))).then(showLoaded).catch(showFailure);
+    }
+    if (shortId) {
+      if (blocked.indexOf(shortId.toLowerCase()) >= 0) { showFailure(new Error('blocked')); }
+      else {
+        fetch(siteUrl('/api/share') + '?id=' + encodeURIComponent(shortId), { headers: { 'Accept': 'text/plain' } }).then(function (r) {
+          if (r.status === 410) throw new Error('blocked');
+          if (!r.ok) throw new Error('missing');
+          return r.text();
+        }).then(function (t) { start(t.trim()); }).catch(showFailure);
+      }
+    } else {
+      start(hash.get('s') || '');
+    }
     function catInfo() {
       var c = cats[m.category] || { l: 'Custom', p: 'Pick a winner' };
       return { label: m.category === 'custom' && m.custom ? m.custom : c.l, prompt: m.instructions || c.p };
@@ -830,8 +878,11 @@
       m.wins = {}; m.losses = {}; m.pairs = {}; m.seen = {}; m.round = 1; lput(m).then(showArena);
     });
     q('[data-lp-delete]').addEventListener('click', function () {
-      if (!window.confirm('Delete this match from this browser? This cannot be undone.')) return;
-      ldel(m.id).then(function () { location.href = siteUrl('/explore'); });
+      var onServer = !!(m.shortId && m.shortKey);
+      if (!window.confirm(onServer ? 'Delete this match from the website and this browser? Its link will stop working. This cannot be undone.'
+        : 'Delete this match from this browser? This cannot be undone.')) return;
+      deleteServerCopy(m).then(function () { return ldel(m.id); }).then(function () { location.href = siteUrl('/explore'); })
+        .catch(function () { window.alert('The match could not be deleted from the website right now. Check your connection and try again.'); });
     });
     q('[data-lp-share]').addEventListener('click', function () {
       var panel = q('[data-lp-share-panel]'), input = q('[data-lp-share-url]'), note = q('[data-lp-share-note]');
@@ -841,10 +892,11 @@
         q('[data-lp-code]').textContent = m.code || '';
         q('[data-lp-share-intro]').textContent = 'This link is encrypted. It only opens with the access code, so send the code separately (for example by text message).';
       }
-      shareUrlFor(m).then(function (url) {
-        input.value = url;
-        note.textContent = url.length > 60000 ? 'This link is long because it carries the photos. If an app cuts it off, send it by email or copy it into a note.' : '';
-        if (navigator.share) navigator.share({ title: m.title, url: url }).catch(function () {});
+      shareLinkFor(m, shortEnabled).then(function (link) {
+        input.value = link.url;
+        note.textContent = link.fallback ? 'Short links are unavailable right now, so this is the full link. It works the same.'
+          : (!link.short && link.url.length > 2000 ? 'This link is long because it carries the photos. If an app cuts it off, send it by email or copy it into a note.' : '');
+        if (navigator.share) navigator.share({ title: m.title, text: (m.private ? 'Private match on XEVION FaceMatch' : 'Vote on “' + m.title + '” on XEVION FaceMatch'), url: link.url }).catch(function () {});
       }).catch(function () { note.textContent = 'The link could not be created in this browser.'; });
     });
     q('[data-lp-copy]').addEventListener('click', function () {
@@ -861,36 +913,90 @@
     }
   }
 
-  /* ---------- "Your matches" list ---------- */
+  /* ---------- match lists: public matches on the server + matches on this device ---------- */
+  function matchCard(o) {
+    var a = el('a', 'match-card'); a.href = o.href;
+    var duo = el('div', 'duo'); duo.setAttribute('aria-hidden', 'true');
+    [0, 1].forEach(function (i) {
+      var src = safeImg(o.imgs[i]);
+      if (src) { var img = el('img'); img.src = src; img.alt = ''; img.loading = 'lazy'; duo.appendChild(img); }
+      else duo.appendChild(el('span', 'duo-empty', ''));
+    });
+    duo.appendChild(el('span', 'duo-vs', 'VS'));
+    var body = el('div', 'match-body');
+    body.appendChild(el('h3', null, o.title));
+    var meta = el('div', 'match-meta');
+    meta.appendChild(el('span', 'pill pill-cat', o.cat));
+    if (o.tag) meta.appendChild(el('span', 'pill', o.tag));
+    var meta2 = el('div', 'match-meta');
+    meta2.appendChild(el('span', null, o.count + ' contenders'));
+    if (o.extra) meta2.appendChild(el('span', null, o.extra));
+    body.appendChild(meta); body.appendChild(meta2);
+    a.appendChild(duo); a.appendChild(body);
+    return a;
+  }
+  function catLabel(labels, c, cc) { return c === 'custom' && cc ? cc : (labels[c] || 'Custom'); }
+  function ago(ts) {
+    var s = Math.max(0, (Date.now() - ts) / 1000);
+    if (s < 3600) return Math.max(1, Math.round(s / 60)) + ' min ago';
+    if (s < 86400) return Math.round(s / 3600) + ' h ago';
+    return Math.round(s / 86400) + ' d ago';
+  }
+  /** Public matches stored on the server, newest first. Resolves to the short ids shown. */
+  function loadPublic(root, labels) {
+    var page = 1, cat = root.dataset.category || '', limit = +(root.dataset.limit || 0), grid = $('[data-public-grid]', root);
+    var more = $('[data-public-more]', root), empty = $('[data-public-empty]', root), shown = [];
+    function fetchPage() {
+      var qs = '?list=1&page=' + page + (cat ? '&category=' + encodeURIComponent(cat) : '');
+      return fetch(siteUrl('/api/share') + qs, { headers: { 'Accept': 'application/json' } }).then(function (r) {
+        if (!r.ok) throw new Error('list failed');
+        return r.json();
+      }).then(function (j) {
+        var items = (j.items || []).filter(function (it) { return it && /^[A-Za-z0-9]{10}$/.test(it.id); });
+        if (limit) items = items.slice(0, limit);
+        items.forEach(function (it) {
+          shown.push(it.id);
+          grid.appendChild(matchCard({ href: siteUrl('/s/' + it.id), imgs: it.g || [], title: clip(it.t, 120) || 'Match',
+            cat: catLabel(labels, it.c, clip(it.cc, 40)), tag: '', count: +it.n || 0, extra: it.at ? ago(+it.at) : '' }));
+        });
+        if (empty) empty.hidden = shown.length > 0;
+        if (more) more.hidden = !(j.more && !limit);
+        if (limit && !shown.length && root.hasAttribute('data-hide-empty')) root.hidden = true;
+        return shown;
+      });
+    }
+    if (more) more.addEventListener('click', function () { page += 1; more.disabled = true; fetchPage().then(function () { more.disabled = false; }); });
+    return fetchPage().catch(function () {
+      if (root.hasAttribute('data-hide-empty')) root.hidden = true;
+      else if (empty) { empty.hidden = false; empty.textContent = 'Public matches could not be loaded right now.'; }
+      return shown;
+    });
+  }
+  var labelsNode = $('[data-labels]');
+  var listLabels = {}; try { listLabels = JSON.parse((labelsNode && labelsNode.dataset.labels) || '{}'); } catch (e) {}
+  var publicRoots = $$('[data-public-list]');
+  var publicLoaded = Promise.all(publicRoots.map(function (r) { return loadPublic(r, listLabels); }))
+    .then(function (a) { return [].concat.apply([], a); });
+
   var listRoot = $('[data-local-list]');
   if (listRoot) {
-    var labels = {}; try { labels = JSON.parse(listRoot.dataset.labels || '{}'); } catch (e) {}
-    lall().then(function (items) {
+    var labels = listLabels;
+    Promise.all([lall(), publicRoots.length ? publicLoaded : Promise.resolve([])]).then(function (r) {
+      var items = r[0], onSite = r[1];
       var cat = listRoot.dataset.category;
       var blockedList = blockedIds(listRoot);
-      items = items.filter(function (m) { return (!cat || m.category === cat) && blockedList.indexOf(m.id) < 0; }).sort(function (a, b) { return b.created - a.created; });
+      // Public matches already listed above are not repeated in "On this device".
+      items = items.filter(function (m) {
+        return (!cat || m.category === cat) && blockedList.indexOf(m.id) < 0 && !(m.shortId && onSite.indexOf(m.shortId) >= 0);
+      }).sort(function (a, b) { return b.created - a.created; });
       if (!items.length) { $('[data-local-empty]').hidden = false; return; }
       items.forEach(function (m) {
-        var a = el('a', 'match-card'); a.href = siteUrl('/play') + '#id=' + encodeURIComponent(m.id);
-        var duo = el('div', 'duo'); duo.setAttribute('aria-hidden', 'true');
-        [0, 1].forEach(function (i) {
-          var p = m.people[i];
-          if (p && safeImg(p.img)) { var img = el('img'); img.src = p.img; img.alt = ''; img.loading = 'lazy'; duo.appendChild(img); }
-          else duo.appendChild(el('span', 'duo-empty', ''));
-        });
-        duo.appendChild(el('span', 'duo-vs', 'VS'));
-        var body = el('div', 'match-body');
-        body.appendChild(el('h3', null, m.title));
-        var meta = el('div', 'match-meta');
-        meta.appendChild(el('span', 'pill pill-cat', m.category === 'custom' && m.custom ? m.custom : (labels[m.category] || 'Custom')));
-        meta.appendChild(el('span', 'pill', m.mine ? 'Created here' : 'Shared with you'));
         var votes = Object.keys(m.wins || {}).reduce(function (s, k) { return s + m.wins[k]; }, 0);
-        var meta2 = el('div', 'match-meta');
-        meta2.appendChild(el('span', null, m.people.length + ' contenders'));
-        meta2.appendChild(el('span', null, votes + (votes === 1 ? ' vote' : ' votes')));
-        body.appendChild(meta); body.appendChild(meta2);
-        a.appendChild(duo); a.appendChild(body);
-        listRoot.appendChild(a);
+        listRoot.appendChild(matchCard({
+          href: m.shortId ? siteUrl('/s/' + m.shortId) : siteUrl('/play') + '#id=' + encodeURIComponent(m.id),
+          imgs: [m.people[0] && m.people[0].img, m.people[1] && m.people[1].img], title: m.title,
+          cat: catLabel(labels, m.category, m.custom), tag: m.private ? 'Private' : (m.mine ? 'Created here' : 'Shared with you'),
+          count: m.people.length, extra: votes + (votes === 1 ? ' vote' : ' votes') }));
       });
     }).catch(function () { $('[data-local-empty]').hidden = false; });
   }
@@ -966,9 +1072,17 @@
     form.addEventListener('submit', function (e) {
       e.preventDefault();
       out.hidden = false; out.textContent = 'Opening the link…';
-      var link = form.link.value, at = link.indexOf('#s=');
-      if (at < 0) { out.textContent = 'That is not a FaceMatch share link (it should contain “#s=”).'; return; }
-      decodeShared(decodeURIComponent(link.slice(at + 3)), form.code.value).then(function (r) {
+      var link = form.link.value, at = link.indexOf('#s='), short = /\/s\/([A-Za-z0-9]{10})(?:[?#]|$)/.exec(link);
+      if (at < 0 && !short) { out.textContent = 'That is not a FaceMatch share link (it should contain “/s/” or “#s=”).'; return; }
+      var packed = short
+        ? fetch(siteUrl('/api/share') + '?id=' + short[1]).then(function (r) {
+            if (r.status === 410) throw new Error('already blocked');
+            if (!r.ok) throw new Error('not found');
+            return r.text();
+          })
+        : Promise.resolve(decodeURIComponent(link.slice(at + 3)));
+      packed.then(function (p) { return decodeShared(p.trim(), form.code.value); }).then(function (r) {
+        if (short) r.id = short[1];
         var m = r.match;
         out.textContent = '';
         out.appendChild(el('h3', null, m.title));
@@ -985,8 +1099,9 @@
         });
         out.appendChild(grid);
         out.appendChild(el('p', 'small muted', 'To block it, add ' + r.id + ' to BLOCKED_MATCHES in Vercel and redeploy.'));
-      }).catch(function () {
-        out.textContent = form.link.value.indexOf('#s=e') >= 0 ? 'This private link needs the right access code.' : 'This link is damaged or not a valid FaceMatch match.';
+      }).catch(function (ex) {
+        if (ex && /already blocked|not found/.test(ex.message)) { out.textContent = 'This short link is ' + ex.message + '.'; return; }
+        out.textContent = form.code.value === '' && (form.link.value.indexOf('#s=e') >= 0 || short) ? 'If this is a private match, enter its access code.' : 'This link is damaged, or the access code is wrong.';
       });
     });
   }

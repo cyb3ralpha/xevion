@@ -1,6 +1,19 @@
 <section class="page-head"><div class="container"><h1>Privacy Policy</h1><p>How XEVION FaceMatch handles information. Plain-language summary of what the service actually does.</p></div></section>
 <div class="container prose">
-<?php if (!db_enabled()): ?>
+<?php if (!db_enabled() && short_links_enabled()): ?>
+  <h2>How this site handles your data</h2>
+  <p>This site runs without a database. Matches you create are <strong>stored on our server</strong> (file storage at our hosting provider, Vercel) so their links work on any device.</p>
+  <ul>
+    <li><strong>Photos and names</strong> are resized and redrawn in your browser before upload, which removes metadata such as GPS location. The server keeps smaller copies of the photos.</li>
+    <li><strong>Public matches</strong> are listed on the website, and anyone can open and vote on them.</li>
+    <li><strong>Private matches</strong> are encrypted in your browser with the access code before upload. They are never listed, and we can’t read them without the code.</li>
+    <li><strong>Votes and results</strong> are counted on each voter’s device. We never receive them.</li>
+    <li><strong>Deleting:</strong> use “Delete match” on the match page in the browser that created it. That removes it from the server and its link stops working. Copies other people opened stay on their devices.</li>
+    <li><strong>Server logs:</strong> Vercel keeps standard request logs for security and reliability.</li>
+  </ul>
+  <p>We don’t use advertising trackers, third-party analytics, cookies for tracking or browser fingerprinting.</p>
+  <?php if (site_contact_email() !== ''): ?><p>Questions or removal requests: <a href="mailto:<?= e(site_contact_email()) ?>"><?= e(site_contact_email()) ?></a>.</p><?php endif; ?>
+<?php elseif (!db_enabled()): ?>
   <h2>How this site handles your data</h2>
   <p>This site runs without a database. Matches you create are kept <strong>in your own browser</strong> and are never uploaded to our servers.</p>
   <ul>

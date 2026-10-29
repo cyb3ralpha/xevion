@@ -33,6 +33,18 @@ What this mode cannot do, because there is nowhere shared to keep data:
 - Share links with many photos are long; some chat apps shorten or cut very long links.
 - There is no public listing of other people's matches, no moderation, no admin dashboard, no reports or contact form, and no ads. Those pages say they are not available.
 
+### Short share links
+
+By default a share link carries the whole match, photos included, so it is very long. Connect **Vercel Blob** to get short links such as `https://www.xevion.pk/s/aB3dE5fG7h`:
+
+1. In Vercel open **Project → Storage → Create Database → Blob**, choose **Private** access, and create it.
+2. Connect it to this project (all environments). Vercel adds `BLOB_READ_WRITE_TOKEN` automatically.
+3. Redeploy.
+
+**Share** then stores the match in Blob through `api/share.js` (a small Node function that uses the official `@vercel/blob` library) and shows the short link. Short links get a proper preview card in chat apps, with the match title and question; private matches only show "Private match". Without Blob, or if storing fails, Share falls back to the long link, so sharing always works.
+
+Blob is file storage, not a database. It holds one small text file per shared match. Blocking a short link (its ID in `BLOCKED_MATCHES`) is enforced by the server.
+
 ### Admin dashboard without a database
 
 `/admin/` stays switched off (it shows setup steps) until you add these in **Project → Settings → Environment Variables** and redeploy. See `.env.example`:

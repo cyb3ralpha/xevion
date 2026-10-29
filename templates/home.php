@@ -27,6 +27,18 @@ $lists = [
   </div>
 </section>
 
+<?php if (!empty($serverStore)): ?>
+<section class="section" data-public-list data-limit="6" data-hide-empty data-labels="<?= e(json_encode(array_map(static fn($c) => $c['label'], categories()), JSON_UNESCAPED_UNICODE)) ?>">
+  <div class="container">
+    <div class="section-head">
+      <div><h2><span class="h-icon"><?= icon('clock') ?></span>Just created</h2><p>The newest public matches.</p></div>
+      <a class="more-link" href="<?= e(url('/explore')) ?>">Browse everything <?= icon('arrow') ?></a>
+    </div>
+    <div class="match-grid" data-public-grid></div>
+  </div>
+</section>
+<?php endif; ?>
+
 <?php foreach ($lists as [$var, $ic, $heading, $sub, $link]): ?>
   <?php if (!empty($$var)): ?>
   <section class="section">
