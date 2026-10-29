@@ -5,14 +5,22 @@
  *   POST /api/share  {"action": "delete", "id", "key"}       -> {"ok": true}
  *   GET  /api/share?id=aB3dE5fG7h                           -> the packed match (text)
  *   GET  /api/share?list=1[&category=smile][&page=2]        -> {"items": [...], "more": bool}
+ *   POST /api/share  {"action": "vote", "id", "voter", "votes": [[winner, loser], ...], "vt"?}
+ *   GET  /api/share?tally=aB3dE5fG7h                        -> {"n", "w": [...], "g": [...], "v", "voters"}
  *
  * Blob layout:
  *   s/{id}.txt                      the packed match (public: deflated JSON; private: AES-GCM ciphertext)
  *   k/{id}.json                     {"h": sha256(delete key), "i": index pathname or ""}
  *   i/{newest-first}-{id}-{cat}.json  public matches only: title, category, count and two cover photos
+ *   t/{id}.json                     shared vote tally: wins and matchups per contender (by position),
+ *                                   hashed voter/pair keys so one browser counts once per pair, and for
+ *                                   private matches the hash of the vote token derived from the access code
  *
  * Public matches are listed on the site. Private ones are encrypted in the browser with the
  * access code, are never listed, and can only be opened through their link plus the code.
+ * Votes are counted for everyone: anyone with a public link can vote; on a private match a vote is
+ * accepted only with a token that only holders of the access code can compute. Tallies are updated
+ * with conditional writes (ETag), so simultaneous votes are not lost.
  * The Blob token (BLOB_READ_WRITE_TOKEN) stays on the server.
  */
 'use strict';
@@ -28,6 +36,9 @@ const CAT_RE = /^[a-z]{2,20}$/;
 const PAYLOAD_RE = /^[zue][A-Za-z0-9_-]+$/;
 const IMG_RE = /^data:image\/(jpeg|png|webp);base64,[A-Za-z0-9+/=]+$/;
 const PAGE_SIZE = 24;
+const VOTER_RE = /^[A-Za-z0-9_-]{16,64}$/;
+const VT_RE = /^[a-f0-9]{64}$/;
+const MAX_SEEN = 100000;                        // voter/pair keys kept per match (about 1.1 MB)
 
 // Best-effort per-instance limit; use Vercel Firewall rate limiting for a hard limit.
 const recent = new Map();
@@ -82,6 +93,17 @@ async function readBlob(pathname) {
   return null;
 }
 
+/** Read a blob uncached, with its ETag, for read-modify-write. Returns {text, etag, access} or null. */
+async function readFresh(pathname) {
+  for (const access of ['private', 'public']) {
+    try {
+      const r = await get(pathname, { access, useCache: false });
+      if (r && r.statusCode === 200 && r.stream) return { text: await new Response(r.stream).text(), etag: r.blob && r.blob.etag, access };
+    } catch (e) { /* try the other access type */ }
+  }
+  return null;
+}
+
 async function writeBlob(pathname, body, contentType) {
   let lastError = null;
   for (const access of ['private', 'public']) {            // private stores first; older public stores still work
@@ -120,9 +142,94 @@ async function handleList(req, res) {
   return res.status(200).json({ ok: true, items, more: paths.length > page * PAGE_SIZE, total: paths.length });
 }
 
+const newTally = (n, vh) => ({ n, w: new Array(n).fill(0), g: new Array(n).fill(0), v: 0, vs: '', s: '', vh: vh || '' });
+const publicTally = (t) => ({ ok: true, n: t.n, w: t.w, g: t.g, v: t.v, voters: t.vs.length / 8 });
+
+/** The current tally, or a fresh one for a public match stored before voting existed. */
+async function loadTally(id) {
+  const cur = await readFresh(`t/${id}.json`);
+  if (cur) {
+    try { return { t: JSON.parse(cur.text), etag: cur.etag, access: cur.access }; } catch (e) { return null; }
+  }
+  const text = await readBlob(`s/${id}.txt`);
+  if (text === null || text[0] === 'e') return null;          // private matches get their tally at creation
+  const d = decodePublic(text.trim());
+  return d ? { t: newTally(d.p.length), etag: null } : null;
+}
+
+async function handleTally(req, res, id) {
+  const cur = await loadTally(id);
+  if (!cur) return res.status(404).json({ ok: false, error: 'not_found' });
+  res.setHeader('Cache-Control', 'public, max-age=0, s-maxage=3, stale-while-revalidate=10');
+  return res.status(200).json(publicTally(cur.t));
+}
+
+function hasVoter(vs, h) {
+  for (let i = 0; i < vs.length; i += 8) if (vs.substr(i, 8) === h) return true;
+  return false;
+}
+
+/** Create a blob only if it doesn't exist yet; throws if it does. */
+async function writeNew(pathname, body, contentType) {
+  let lastError = null;
+  for (const access of ['private', 'public']) {
+    try { return await put(pathname, body, { access, addRandomSuffix: false, allowOverwrite: false, contentType }); } catch (e) {
+      lastError = e;
+      if (/exist/i.test(String(e && e.message))) throw e;      // created meanwhile: the caller re-reads
+    }
+  }
+  throw lastError || new Error('storage_failed');
+}
+
+async function handleVote(req, res) {
+  const b = req.body, id = String(b.id || ''), voter = String(b.voter || '');
+  if (!ID_RE.test(id) || !VOTER_RE.test(voter) || !Array.isArray(b.votes) || !b.votes.length || b.votes.length > 190) {
+    return res.status(400).json({ ok: false, error: 'bad_request' });
+  }
+  if (blocked().includes(id.toLowerCase())) return res.status(410).json({ ok: false, error: 'blocked' });
+  const voterHash = sha256(`${id}|${voter}`).slice(0, 8);
+  for (let attempt = 0; attempt < 8; attempt++) {
+    const cur = await loadTally(id);
+    if (!cur) return res.status(404).json({ ok: false, error: 'not_found' });
+    const t = cur.t, n = t.n;
+    if (t.vh) {
+      const vt = String(b.vt || ''), a = Buffer.from(t.vh), c = Buffer.from(VT_RE.test(vt) ? sha256(vt) : '');
+      if (a.length !== c.length || !crypto.timingSafeEqual(a, c)) return res.status(403).json({ ok: false, error: 'code_required' });
+    }
+    let added = 0;
+    for (const pair of b.votes) {
+      if (!Array.isArray(pair) || pair.length !== 2) continue;
+      const w = pair[0], l = pair[1];
+      if (!Number.isInteger(w) || !Number.isInteger(l) || w === l || w < 0 || l < 0 || w >= n || l >= n) continue;
+      const key = sha256(`${voterHash}|${Math.min(w, l)}|${Math.max(w, l)}`).slice(0, 10) + ',';
+      if (t.s.indexOf(key) >= 0 || t.s.length / 11 >= MAX_SEEN) continue;   // this browser already voted on this pair
+      t.s += key; t.w[w]++; t.g[w]++; t.g[l]++; t.v++; added++;
+    }
+    if (!added) return res.status(200).json(Object.assign(publicTally(t), { added: 0 }));
+    if (!hasVoter(t.vs, voterHash)) t.vs += voterHash;
+    try {
+      const body = JSON.stringify(t);
+      if (cur.etag) {
+        await put(`t/${id}.json`, body, { access: cur.access, addRandomSuffix: false, contentType: 'application/json', ifMatch: cur.etag });
+      } else {
+        await writeNew(`t/${id}.json`, body, 'application/json');
+      }
+      return res.status(200).json(Object.assign(publicTally(t), { added }));
+    } catch (e) {
+      // Another vote landed first (the ETag changed, or the tally was just created): re-read and retry.
+      await new Promise((r) => setTimeout(r, 40 + Math.random() * 120 * (attempt + 1)));
+    }
+  }
+  return res.status(503).json({ ok: false, error: 'busy' });
+}
+
 async function handleCreate(req, res, payload) {
   const d = payload[0] === 'e' ? null : decodePublic(payload);
   if (payload[0] !== 'e' && !d) return res.status(400).json({ ok: false, error: 'bad_payload' });
+  // Private matches: the browser sends the contender count and a token derived from the access code.
+  // Without them (a page from before shared voting) the match is stored but votes stay on each device.
+  const n = d ? d.p.length : Number(req.body.n), vt = String(req.body.vt || '');
+  const countable = !!d || (Number.isInteger(n) && n >= 2 && n <= 20 && VT_RE.test(vt));
 
   const id = newId(), key = crypto.randomBytes(24).toString('base64url');
   let indexPath = '';
@@ -137,6 +244,7 @@ async function handleCreate(req, res, payload) {
       };
       await writeBlob(indexPath, JSON.stringify(entry), 'application/json');
     }
+    if (countable) await writeBlob(`t/${id}.json`, JSON.stringify(newTally(n, d ? '' : sha256(vt))), 'application/json');
     await writeBlob(`k/${id}.json`, JSON.stringify({ h: sha256(key), i: indexPath }), 'application/json');
   } catch (e) {
     console.error('share upload failed:', e && e.message);
@@ -153,7 +261,7 @@ async function handleDelete(req, res) {
   if (!meta || typeof meta.h !== 'string') return res.status(404).json({ ok: false, error: 'not_found' });
   const a = Buffer.from(meta.h), b = Buffer.from(sha256(key));
   if (a.length !== b.length || !crypto.timingSafeEqual(a, b)) return res.status(403).json({ ok: false, error: 'wrong_key' });
-  const paths = [`s/${id}.txt`, `k/${id}.json`];
+  const paths = [`s/${id}.txt`, `k/${id}.json`, `t/${id}.json`];
   if (typeof meta.i === 'string' && /^i\/[\w-]+\.json$/.test(meta.i)) paths.push(meta.i);
   try {
     const found = [];
@@ -179,6 +287,12 @@ module.exports = async (req, res) => {
   try {
     if (req.method === 'GET') {
       if (req.query && req.query.list) return await handleList(req, res);
+      if (req.query && req.query.tally) {
+        const tid = String(req.query.tally);
+        if (!ID_RE.test(tid)) return res.status(400).json({ ok: false, error: 'bad_id' });
+        if (blocked().includes(tid.toLowerCase())) return res.status(410).json({ ok: false, error: 'blocked' });
+        return await handleTally(req, res, tid);
+      }
       const id = String((req.query && req.query.id) || '');
       if (!ID_RE.test(id)) return res.status(400).json({ ok: false, error: 'bad_id' });
       if (blocked().includes(id.toLowerCase())) return res.status(410).json({ ok: false, error: 'blocked' });
@@ -193,8 +307,12 @@ module.exports = async (req, res) => {
     if (req.method === 'POST') {
       if (!sameOrigin(req)) return res.status(403).json({ ok: false, error: 'origin' });
       const ip = String(req.headers['x-forwarded-for'] || '').split(',')[0].trim() || 'unknown';
-      if (tooMany(ip, 20)) return res.status(429).json({ ok: false, error: 'rate_limited' });
       if (!req.body || typeof req.body !== 'object') return res.status(400).json({ ok: false, error: 'bad_request' });
+      if (req.body.action === 'vote') {
+        if (tooMany('v:' + ip, 60)) return res.status(429).json({ ok: false, error: 'rate_limited' });
+        return await handleVote(req, res);
+      }
+      if (tooMany(ip, 20)) return res.status(429).json({ ok: false, error: 'rate_limited' });
       if (req.body.action === 'delete') return await handleDelete(req, res);
       const payload = typeof req.body.payload === 'string' ? req.body.payload : '';
       if (!payload || payload.length > MAX_PAYLOAD || !PAYLOAD_RE.test(payload)) {

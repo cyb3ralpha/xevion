@@ -98,7 +98,11 @@ $local = !empty($local); // no database: the match is saved in this browser
         <?php else: ?>
         <li><?= icon('lock') ?> The match and its photos are saved only in this browser, never on our servers.</li>
         <?php endif; ?>
+        <?php if (!empty($serverStore)): ?>
+        <li><?= icon('chart') ?> Everyone’s votes add up to one live leaderboard. On a private match, only people with the code can vote.</li>
+        <?php else: ?>
         <li><?= icon('chart') ?> Each device keeps its own results. Pass one phone around to vote together.</li>
+        <?php endif; ?>
       </ul>
     </section>
     <?php else: ?>

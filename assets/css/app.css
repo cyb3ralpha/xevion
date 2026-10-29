@@ -326,6 +326,20 @@ input:focus, select:focus, textarea:focus { outline: none; border-color: var(--x
 .standings .who { display: flex; align-items: center; gap: 12px; font-weight: 600; }
 .standings .who img, .standings .who .ph { width: 44px; height: 55px; object-fit: cover; border-radius: 8px; background: var(--x-panel-2); flex: none; }
 .rank { font: 700 1.1rem var(--font-display); color: #fff; }
+.standings tr.top1 .rank { color: #FFD166; }
+.standings tr.top2 .rank { color: #D7DCEB; }
+.standings tr.top3 .rank { color: #E3A06B; }
+.standings tr.top1 .who img { box-shadow: 0 0 0 2px #FFD166; }
+@media (max-width: 520px) {
+  [data-local-play] .standings th, [data-local-play] .standings td { padding: 10px 5px; }
+  [data-local-play] .standings .who { gap: 8px; }
+  [data-local-play] .standings .who img { width: 36px; height: 45px; }
+  [data-local-play] .standings .bar { min-width: 56px; }
+}
+.seg { display: inline-flex; padding: 3px; border-radius: 999px; background: var(--x-panel-2); border: 1px solid var(--x-line-soft); }
+.seg button { border: 0; background: none; color: var(--x-muted); font: 600 .85rem inherit; font-family: inherit; padding: 6px 12px; border-radius: 999px; cursor: pointer; }
+.seg button[aria-pressed="true"] { background: var(--x-ribbon); color: #fff; }
+.seg button:focus-visible { outline: 2px solid var(--x-blue-hi); outline-offset: 2px; }
 .tie { font-size: .72rem; color: var(--x-warn); border: 1px solid rgba(245,184,65,.4); padding: 1px 6px; border-radius: 999px; margin-left: 6px; }
 .bar { height: 6px; background: var(--x-panel-2); border-radius: 999px; overflow: hidden; min-width: 80px; margin-top: 6px; }
 .bar > i { display: block; height: 100%; background: var(--x-ribbon); }

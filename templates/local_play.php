@@ -71,21 +71,28 @@ foreach ($categoryLabels as $k => $label) {
 
     <section data-lp-done class="arena-state card" hidden>
       <h2>Round complete</h2>
-      <p class="muted">You voted on every matchup. See the standings, or hand the device to the next person.</p>
+      <p class="muted" data-lp-done-text>You voted on every matchup. See the standings, or hand the device to the next person.</p>
       <div class="btn-row" style="justify-content:center">
         <button class="btn btn-primary" type="button" data-lp-tab="results"><?= icon('chart') ?> See results</button>
         <button class="btn btn-ghost" type="button" data-lp-next-round><?= icon('bolt') ?> Next voter</button>
+        <button class="btn btn-ghost" type="button" data-lp-done-share hidden><?= icon('link') ?> Share</button>
       </div>
     </section>
 
     <section data-lp-results class="card pad" hidden style="margin-top:20px">
-      <div class="section-head" style="margin-bottom:8px"><div><h2 style="margin:0">Standings</h2><p data-lp-total></p></div>
-        <button class="btn btn-ghost btn-sm" type="button" data-lp-tab="arena"><?= icon('bolt') ?> Keep voting</button></div>
+      <div class="section-head" style="margin-bottom:8px"><div><h2 style="margin:0">Standings</h2><p data-lp-total aria-live="polite"></p></div>
+        <div class="btn-row">
+          <div class="seg" role="group" aria-label="Whose votes" data-lp-views hidden>
+            <button type="button" data-lp-view="all" aria-pressed="true">Everyone</button>
+            <button type="button" data-lp-view="me" aria-pressed="false">This device</button>
+          </div>
+          <button class="btn btn-ghost btn-sm" type="button" data-lp-tab="arena"><?= icon('bolt') ?> Keep voting</button>
+        </div></div>
       <div class="table-scroll"><table class="standings">
         <thead><tr><th>#</th><th>Contender</th><th class="num">Win rate</th><th class="num">Won–lost</th></tr></thead>
         <tbody data-lp-rows></tbody>
       </table></div>
-      <p class="muted small" style="margin-bottom:0">Ranked by win rate across head-to-head votes on this device. Equal win rates are split by total wins; if still level, contenders share the place.</p>
+      <p class="muted small" style="margin-bottom:0" data-lp-results-note>Ranked by win rate across head-to-head votes on this device. Equal win rates are split by total wins; if still level, contenders share the place.</p>
     </section>
 
     <div class="arena-foot">

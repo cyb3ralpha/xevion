@@ -45,11 +45,14 @@ With Blob connected, **Create match** uploads the match through `api/share.js` (
 
 - **Public** matches are listed for everyone on the home page ("Just created"), on Explore and on their category page, newest first.
 - **Private** matches are encrypted in the creator's browser with the access code before upload. They are never listed and open only through their link plus the code.
-- **Delete match** on the match page removes it from the server, but only in the browser that created it, which holds a secret delete key.
+- **Shared voting.** Votes from everyone are added to one live leaderboard per match (results show "Everyone" and "This device"). Each browser counts once per matchup. On a private match the server accepts a vote only with a token that is derived from the access code, so only people with the code can vote. Votes are batched (one request per few votes) and saved with conditional writes, so simultaneous votes are not lost.
+- **Delete match** on the match page removes it and its results from the server, but only in the browser that created it, which holds a secret delete key.
 - Short links get a preview card in chat apps with the match title and question; private ones only show "Private match".
 - If an upload fails, the match stays in the browser and Share tries again; Share falls back to the long link if storage is unavailable.
 
-Blob is file storage, not a database. Per match it holds the packed match (`s/{id}.txt`) and its delete-key hash (`k/{id}.json`); public matches also get a small listing entry with two cover photos (`i/…json`). Votes stay on each voter's device. Blocking a match (its short ID in `BLOCKED_MATCHES`) hides it from the lists and stops its link, enforced by the server. To remove a match completely, delete its three files in **Storage → Blob → Browser**.
+Blob is file storage, not a database. Per match it holds the packed match (`s/{id}.txt`), its delete-key hash (`k/{id}.json`) and its vote tally (`t/{id}.json`); public matches also get a small listing entry with two cover photos (`i/…json`). Blocking a match (its short ID in `BLOCKED_MATCHES`) hides it from the lists and stops its link and its voting, enforced by the server. To remove a match completely, delete its files in **Storage → Blob → Browser**.
+
+Every batch of votes is one read and one write in Blob. Check **Usage** in Vercel against your plan's Blob operation allowance if the site gets busy; vote counts are only as reliable as anonymous voting allows (see `docs/SECURITY.md`).
 
 ### Admin dashboard without a database
 

@@ -611,12 +611,38 @@
     }).then(function (pt) { return new TextDecoder().decode(pt); });
   }
   /** Store the packed match on the server and return its short /s/{id} URL. */
-  function createShortLink(packed) {
-    return fetch(siteUrl('/api/share'), {
-      method: 'POST', credentials: 'same-origin',
-      headers: { 'Content-Type': 'application/json', 'Accept': 'application/json' },
-      body: JSON.stringify({ payload: packed })
+  function createShortLink(packed, m) {
+    var body = { payload: packed };
+    return (m && m.private ? voteToken(m.code) : Promise.resolve('')).then(function (vt) {
+      if (vt) { body.n = m.people.length; body.vt = vt; }
+      return fetch(siteUrl('/api/share'), {
+        method: 'POST', credentials: 'same-origin',
+        headers: { 'Content-Type': 'application/json', 'Accept': 'application/json' },
+        body: JSON.stringify(body)
+      });
     }).then(function (r) { return r.json().then(function (j) { if (!r.ok || !j.id) throw new Error(j.error || 'short link failed'); return j; }); });
+  }
+  /** Proof of the access code for voting on a private match; the server only keeps its hash. */
+  function voteToken(code) {
+    var norm = String(code || '').toUpperCase().replace(/[^A-Z0-9]/g, '');
+    if (!norm || !window.crypto || !crypto.subtle) return Promise.resolve('');
+    return crypto.subtle.digest('SHA-256', new TextEncoder().encode('xevion-vote|' + norm)).then(function (buf) {
+      return Array.prototype.map.call(new Uint8Array(buf), function (x) { return ('0' + x.toString(16)).slice(-2); }).join('');
+    });
+  }
+  /** A random id for this browser, so the server counts it once per matchup. Not an identity. */
+  function voterId() {
+    var k = 'xevion-voter', v = '';
+    try { v = localStorage.getItem(k) || ''; } catch (e) {}
+    if (!/^[A-Za-z0-9_-]{16,64}$/.test(v)) {
+      v = b64urlFromBytes(crypto.getRandomValues(new Uint8Array(18)));
+      try { localStorage.setItem(k, v); } catch (e) {}
+    }
+    return v;
+  }
+  function fetchTally(id) {
+    return fetch(siteUrl('/api/share') + '?tally=' + encodeURIComponent(id), { headers: { 'Accept': 'application/json' } })
+      .then(function (r) { if (!r.ok) throw new Error('tally ' + r.status); return r.json(); });
   }
   /** Remove a match from the server (only the browser that uploaded it holds the delete key). */
   function deleteServerCopy(m) {
@@ -632,7 +658,7 @@
     if (shortEnabled && m.shortId) return Promise.resolve({ url: location.origin + siteUrl('/s/' + m.shortId), short: true });
     return shareUrlFor(m).then(function (longUrl) {
       if (!shortEnabled) return { url: longUrl, short: false };
-      return createShortLink(longUrl.slice(longUrl.indexOf('#s=') + 3)).then(function (j) {
+      return createShortLink(longUrl.slice(longUrl.indexOf('#s=') + 3), m).then(function (j) {
         var id = j.id;
         m.shortId = id; m.shortKey = j.key || undefined;
         return lput(m).then(function () { return { url: location.origin + siteUrl('/s/' + id), short: true }; });
@@ -764,6 +790,46 @@
       return { label: m.category === 'custom' && m.custom ? m.custom : c.l, prompt: m.instructions || c.p };
     }
     function pairKey(a, b) { return a < b ? a + '|' + b : b + '|' + a; }
+
+    /* Shared voting: matches stored on the server count every browser's votes together. */
+    var pending = [], flushTimer = 0, sending = false, global = null, serverOff = false, view = 'all';
+    function online() { return !!(m && m.shortId && shortEnabled && !serverOff); }
+    function pos(p) { return +String(p.id).slice(1); }
+    function queueVote(w, l) {
+      pending.push([w, l]);
+      clearTimeout(flushTimer);
+      flushTimer = setTimeout(flushVotes, pending.length >= 5 ? 0 : 1200);
+    }
+    function flushVotes(keepalive) {
+      if (sending || !pending.length || !online()) return Promise.resolve();
+      var batch = pending.splice(0, 190);
+      sending = true;
+      return (m.private ? voteToken(m.code) : Promise.resolve('')).then(function (vt) {
+        return fetch(siteUrl('/api/share'), {
+          method: 'POST', credentials: 'same-origin', keepalive: !!keepalive,
+          headers: { 'Content-Type': 'application/json', 'Accept': 'application/json' },
+          body: JSON.stringify({ action: 'vote', id: m.shortId, voter: voterId(), votes: batch, vt: vt || undefined })
+        });
+      }).then(function (r) {
+        if (r.status === 404 || r.status === 403 || r.status === 410) { serverOff = true; return null; }   // not countable online
+        if (!r.ok) throw new Error('vote ' + r.status);
+        return r.json();
+      }).then(function (j) {
+        sending = false;
+        if (j && j.ok) { global = j; if (!q('[data-lp-results]').hidden) renderResults(); }
+        if (pending.length) flushVotes();
+      }).catch(function () {
+        sending = false;
+        pending = batch.concat(pending);                 // keep them and try again shortly
+        clearTimeout(flushTimer); flushTimer = setTimeout(flushVotes, 4000);
+      });
+    }
+    window.addEventListener('pagehide', function () { flushVotes(true); });
+    document.addEventListener('visibilitychange', function () { if (document.visibilityState === 'hidden') flushVotes(true); });
+    function refreshGlobal() {
+      if (!online()) return Promise.resolve(null);
+      return fetchTally(m.shortId).then(function (j) { global = j; return j; }).catch(function () { return global; });
+    }
     function allPairs() {
       var out = [];
       for (var i = 0; i < m.people.length; i++) for (var j = i + 1; j < m.people.length; j++) out.push([m.people[i], m.people[j]]);
@@ -773,20 +839,30 @@
       var ci = catInfo();
       document.title = m.title + ' | XEVION FaceMatch';
       q('[data-lp-title]').textContent = m.title;
-      q('[data-lp-id]').textContent = m.id;
+      q('[data-lp-id]').textContent = online() ? m.shortId : m.id;
       q('[data-lp-cat]').textContent = ci.label;
       q('[data-lp-prompt]').textContent = ci.prompt;
     }
     function progress() {
       var total = allPairs().length, done = Object.keys(m.seen).length;
       q('[data-lp-progress]').style.width = (total ? Math.round(done * 100 / total) : 0) + '%';
-      q('[data-lp-round]').textContent = 'Voter ' + m.round + ' · ' + done + ' of ' + total + ' matchups';
+      q('[data-lp-round]').textContent = (online() ? 'Your votes' : 'Voter ' + m.round) + ' · ' + done + ' of ' + total + ' matchups';
     }
     function showArena() {
       q('[data-lp-results]').hidden = true;
       var left = allPairs().filter(function (p) { return !m.seen[pairKey(p[0].id, p[1].id)]; });
       progress();
-      if (!left.length) { q('[data-lp-arena]').hidden = true; q('[data-lp-done]').hidden = false; return; }
+      if (!left.length) {
+        q('[data-lp-arena]').hidden = true; q('[data-lp-done]').hidden = false;
+        // Online, this browser has cast its votes; others vote on their own devices through the link.
+        q('[data-lp-next-round]').hidden = online();
+        q('[data-lp-done-share]').hidden = !online();
+        q('[data-lp-done-text]').textContent = online()
+          ? 'Your votes are in. Share the link so others can vote; the results update as they do.'
+          : 'You voted on every matchup. See the standings, or hand the device to the next person.';
+        flushVotes();
+        return;
+      }
       q('[data-lp-done]').hidden = true; q('[data-lp-arena]').hidden = false;
       // Prefer a pair that shares nobody with the previous one, so faces don't repeat back to back.
       var fresh = left.filter(function (p) { return last.indexOf(p[0].id + ',') < 0 && last.indexOf(p[1].id + ',') < 0; });
@@ -817,10 +893,11 @@
         btn.setAttribute('aria-disabled', 'true');
       });
       var both = (pr[win.id] || 0) + (pr[lose.id] || 0);
-      q('[data-lp-status]').textContent = both > 1
+      q('[data-lp-status]').textContent = online() ? 'Vote counted.' : both > 1
         ? 'Vote counted. ' + Math.round((pr[win.id] || 0) * 100 / both) + '% of votes on this device agree.'
         : 'Vote counted.';
       q('[data-lp-status]').className = 'arena-status ok';
+      if (online()) queueVote(pos(win), pos(lose));
       lput(m).then(function () {
         var grid = q('[data-lp-grid]');
         setTimeout(function () {
@@ -830,8 +907,15 @@
       }).catch(function () { q('[data-lp-status]').textContent = 'Could not save the vote in this browser.'; busy = false; });
     }
     function renderResults() {
-      var rows = m.people.map(function (p) {
-        var w = m.wins[p.id] || 0, l = m.losses[p.id] || 0;
+      var everyone = online() && view === 'all' && global && global.n === m.people.length;
+      $$('[data-lp-view]', root).forEach(function (b) { b.setAttribute('aria-pressed', String(b.dataset.lpView === (everyone ? 'all' : 'me'))); });
+      q('[data-lp-views]').hidden = !online();
+      q('[data-lp-results-note]').textContent = everyone
+        ? 'Everyone’s votes on this match, updated live. Each browser counts once per matchup. Ranked by win rate; equal rates are split by total wins.'
+        : 'Ranked by win rate across head-to-head votes on this device. Equal win rates are split by total wins; if still level, contenders share the place.';
+      var rows = m.people.map(function (p, i) {
+        var w = everyone ? (+global.w[i] || 0) : (m.wins[p.id] || 0);
+        var l = everyone ? Math.max(0, (+global.g[i] || 0) - w) : (m.losses[p.id] || 0);
         return { p: p, w: w, l: l, rate: w + l ? w / (w + l) : -1 };
       }).sort(function (a, b) { return b.rate - a.rate || b.w - a.w; });
       var tbody = q('[data-lp-rows]'), total = 0;
@@ -841,7 +925,7 @@
         var prev = rows[i - 1], same = prev && prev.rate === r.rate && prev.w === r.w;
         r.rank = same ? prev.rank : i + 1;
         var tied = same || (rows[i + 1] && rows[i + 1].rate === r.rate && rows[i + 1].w === r.w);
-        var tr = el('tr');
+        var tr = el('tr', r.rank <= 3 && r.w + r.l > 0 ? 'top' + r.rank : null);
         tr.appendChild(el('td', 'rank', String(r.rank)));
         var who = el('td'), wrap = el('div', 'who'), img = el('img');
         img.src = safeImg(r.p.img); img.alt = ''; img.width = 44; img.height = 55;
@@ -854,10 +938,21 @@
         tr.appendChild(el('td', 'num', r.w + '–' + r.l));
         tbody.appendChild(tr);
       });
-      q('[data-lp-total]').textContent = total + (total === 1 ? ' vote' : ' votes') + ' on this device';
+      q('[data-lp-total]').textContent = everyone
+        ? total + (total === 1 ? ' vote' : ' votes') + ' from ' + global.voters + (global.voters === 1 ? ' voter' : ' voters')
+        : total + (total === 1 ? ' vote' : ' votes') + ' on this device';
     }
+    var liveTimer = 0;
     function showResults() {
       renderResults();
+      clearInterval(liveTimer);
+      if (online()) {
+        flushVotes().then(refreshGlobal).then(renderResults);
+        liveTimer = setInterval(function () {
+          if (q('[data-lp-results]').hidden || document.visibilityState === 'hidden') return;
+          refreshGlobal().then(renderResults);
+        }, 15000);
+      }
       q('[data-lp-results]').hidden = false;
       q('[data-lp-results]').scrollIntoView({ behavior: reduceMotion ? 'auto' : 'smooth', block: 'start' });
     }
@@ -876,11 +971,16 @@
     $$('[data-lp-tab]', root).forEach(function (b) {
       b.addEventListener('click', function () { if (b.dataset.lpTab === 'results') showResults(); else showArena(); });
     });
+    $$('[data-lp-view]', root).forEach(function (b) {
+      b.addEventListener('click', function () { view = b.dataset.lpView; renderResults(); });
+    });
+    q('[data-lp-done-share]').addEventListener('click', function () { q('[data-lp-share]').click(); });
     q('[data-lp-next-round]').addEventListener('click', function () {
       m.round += 1; m.seen = {}; lput(m).then(showArena);
     });
     q('[data-lp-reset]').addEventListener('click', function () {
-      if (!window.confirm('Clear every vote on this device for this match?')) return;
+      if (!window.confirm(online() ? 'Clear the record of your votes on this device? Votes already counted for everyone stay counted.'
+        : 'Clear every vote on this device for this match?')) return;
       m.wins = {}; m.losses = {}; m.pairs = {}; m.seen = {}; m.round = 1; lput(m).then(showArena);
     });
     q('[data-lp-delete]').addEventListener('click', function () {
@@ -900,6 +1000,8 @@
       }
       shareLinkFor(m, shortEnabled).then(function (link) {
         input.value = link.url;
+        if (link.short && !m.private) q('[data-lp-share-intro]').textContent = 'Anyone with this link can open the match and vote. Every vote counts towards the shared results.';
+        if (link.short && m.private) q('[data-lp-share-intro]').textContent = 'Only people with the access code can open this match and vote. Send the code separately (for example by text message).';
         note.textContent = link.fallback ? 'Short links are unavailable right now, so this is the full link. It works the same.'
           : (!link.short && link.url.length > 2000 ? 'This link is long because it carries the photos. If an app cuts it off, send it by email or copy it into a note.' : '');
         if (navigator.share) navigator.share({ title: m.title, text: (m.private ? 'Private match on XEVION FaceMatch' : 'Vote on “' + m.title + '” on XEVION FaceMatch'), url: link.url }).catch(function () {});

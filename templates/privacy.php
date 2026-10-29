@@ -7,8 +7,8 @@
     <li><strong>Photos and names</strong> are resized and redrawn in your browser before upload, which removes metadata such as GPS location. The server keeps smaller copies of the photos.</li>
     <li><strong>Public matches</strong> are listed on the website, and anyone can open and vote on them.</li>
     <li><strong>Private matches</strong> are encrypted in your browser with the access code before upload. They are never listed, and we can’t read them without the code.</li>
-    <li><strong>Votes and results</strong> are counted on each voter’s device. We never receive them.</li>
-    <li><strong>Deleting:</strong> use “Delete match” on the match page in the browser that created it. That removes it from the server and its link stops working. Copies other people opened stay on their devices.</li>
+    <li><strong>Votes</strong> are added to the match’s shared results on our server. We store only the vote counts per contender and short one-way hashes that stop the same browser voting twice on the same matchup, made from a random identifier your browser keeps for this site. We don’t store your IP address or any account with your votes. On private matches, a vote is accepted only from someone who has the access code.</li>
+    <li><strong>Deleting:</strong> use “Delete match” on the match page in the browser that created it. That removes the match and its results from the server, and its link stops working. Copies other people opened stay on their devices.</li>
     <li><strong>Server logs:</strong> Vercel keeps standard request logs for security and reliability.</li>
   </ul>
   <p>We don’t use advertising trackers, third-party analytics, cookies for tracking or browser fingerprinting.</p>
