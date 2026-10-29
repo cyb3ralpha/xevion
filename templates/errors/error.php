@@ -17,13 +17,13 @@ $base = function_exists('base_path') ? base_path() : '';
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <meta name="robots" content="noindex">
 <title><?= htmlspecialchars($heading) ?> | XEVION FaceMatch</title>
-<link rel="icon" href="<?= htmlspecialchars($base) ?>/assets/img/brand/favicon-32.png">
+<link rel="icon" href="<?= htmlspecialchars($base) ?>/media/brand/favicon-32.png">
 <link rel="stylesheet" href="<?= htmlspecialchars($base) ?>/assets/css/app.css">
 </head>
 <body>
 <main class="error-page">
   <div>
-    <a href="<?= htmlspecialchars($base) ?>/"><img src="<?= htmlspecialchars($base) ?>/assets/img/brand/mark-dark-sm.png" alt="XEVION FaceMatch home" width="54" height="65" style="margin:0 auto 18px"></a>
+    <a href="<?= htmlspecialchars($base) ?>/"><img src="<?= htmlspecialchars($base) ?>/media/brand/mark-dark-sm.png" alt="XEVION FaceMatch home" width="54" height="65" style="margin:0 auto 18px"></a>
     <div class="error-code"><?= (int)$errorCode ?></div>
     <h1 style="font-size:1.8rem;margin-top:8px"><?= htmlspecialchars($heading) ?></h1>
     <p class="muted" style="max-width:44ch;margin:0 auto 24px"><?= htmlspecialchars($text) ?></p>

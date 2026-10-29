@@ -8,7 +8,7 @@ Vercel has no built-in PHP and no MySQL, and its servers have no permanent disk.
 | Routing | `.htaccess` | `vercel.json` sends everything except `/assets/*` and `robots.txt` to `api/index.php` |
 | Settings | `config/config.php` | `config/config.php` |
 | Sessions | `sessions` table | `sessions` table |
-| Photos and banners | `storage/media/` | `media_files` table (chosen automatically) |
+| Photos and banners | `media/uploads/` | `media_files` table (chosen automatically) |
 | Logs | `storage/logs/` | stderr, shown under Vercel → Logs (chosen automatically) |
 | Image processing | GD re-encodes every photo | The browser resizes to JPEG; PHP validates and strips all metadata (GD is not available on Vercel) |
 | Maintenance | A cron job calls `/api/cron` | Vercel Cron calls `/api/cron` daily |
@@ -20,12 +20,17 @@ Deployed as-is, with no `config/config.php`, the site runs on Vercel **without a
 - **Create a match.** The normal form saves the match and its photos in the visitor's own browser (IndexedDB). Nothing is uploaded to the server.
 - **Vote and see results.** `/play` shows head-to-head matchups, a progress bar, live standings (win rate, then total wins, ties share a place), and a "Next voter" button so a group can pass one phone around.
 - **Share.** The Share button makes a link that carries the whole match, with smaller photos, in the part of the URL after `#`, which browsers never send to the server. Anyone who opens it gets the match on their own device and can vote there.
+- **Private matches.** Choosing "Private, with an access code" encrypts the link (AES-GCM, key derived from a random 10-character code with PBKDF2, 210,000 rounds). Without the code the link shows only a lock screen. The organiser sends the code separately.
+- **Upload checks.** Only real JPEG, PNG and WebP files are accepted (checked by their first bytes, not the name), within size and pixel limits. Every photo is redrawn into a new JPEG, which drops camera and location data. Photos inside a shared link are decoded and size-checked again before they are shown.
 - **Your matches.** Explore and the category pages list the matches saved in this browser.
 
 What this mode cannot do, because there is nowhere shared to keep data:
 
 - Votes from different people are not added together. Each device has its own standings.
 - Clearing the browser's site data deletes its matches.
+- Results are not tamper-proof: anyone can change data in their own browser, so per-device standings are for fun, not official results.
+- Once someone has opened a shared link, the organiser cannot revoke or delete their copy. A private link plus its code works for anyone they are passed on to.
+- Share links with many photos are long; some chat apps shorten or cut very long links.
 - There is no public listing of other people's matches, no moderation, no admin dashboard, no reports or contact form, and no ads. Those pages say they are not available.
 
 To get shared results, accounts for admins and everything else, connect a MySQL database as described below. The site switches to the full version automatically.

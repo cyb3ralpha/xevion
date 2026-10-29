@@ -72,6 +72,21 @@ function abs_url(string $path = '/', array $query = []): string
     return $origin . url($path, $query);
 }
 
+/** URL of a static brand image in media/brand/ (cache-busted like asset()). */
+function brand_img(string $file): string
+{
+    $path = APP_ROOT . '/media/brand/' . $file;
+    $v = is_file($path) ? substr((string)filemtime($path), -6) : APP_VERSION;
+    return url('/media/brand/' . $file) . '?v=' . $v;
+}
+
+/** Folder for photos uploaded on ordinary hosting (git-ignored, never web-accessible). */
+function uploads_path(string $sub = ''): string
+{
+    $base = APP_ROOT . '/media/uploads';
+    return $sub === '' ? $base : $base . '/' . ltrim($sub, '/');
+}
+
 function asset(string $path): string
 {
     $file = APP_ROOT . '/assets/' . ltrim($path, '/');

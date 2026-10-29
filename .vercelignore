@@ -1,7 +1,7 @@
 # Local runtime data never goes to Vercel. config/config.php is deliberately NOT listed:
 # the site needs it (see docs/VERCEL.md).
 storage/installed.lock
-storage/media/*
+media/uploads/*
 storage/logs/*
 docs/
 router.php

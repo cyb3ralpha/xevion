@@ -15,7 +15,7 @@ If your host lets you choose the document root, the project root is the document
 
 ## 2. Permissions
 
-PHP must be able to write to `storage/` and its sub-folders `media/` and `logs/`. Typical: `chmod 750 storage storage/*`. Sessions are stored in the database, not on disk.
+PHP must be able to write to `media/uploads/` (photos and ad creatives) and `storage/logs/`. Typical: `chmod 750 media/uploads storage storage/logs`. Sessions are stored in the database, not on disk.
 
 ## 3. Database
 
@@ -80,7 +80,7 @@ Set `cron_secret` in `config/config.php` to a random string of 16+ characters, t
 It closes expired matches, purges rate-limit rows, clears IP-derived keys after the retention period, and archives long-finished ad campaigns. The same job also runs on about 2% of page views, so the site keeps working without cron, just less punctually.
 ## 8. Backups
 
-Back up the database **and** `storage/media/` (photos and ad creatives) together, plus `config/config.php`. Keep the `app_secret`: if it changes, existing private invite links, management links, voter identifiers and IP hashes stop matching.
+Back up the database **and** `media/uploads/` (photos and ad creatives) together, plus `config/config.php`. Keep the `app_secret`: if it changes, existing private invite links, management links, voter identifiers and IP hashes stop matching.
 
 ## Nginx
 

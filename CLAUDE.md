@@ -25,6 +25,7 @@ XEVION FaceMatch is a photo face-off site. Visitors create a match from 2 to 20 
 | `templates/` | PHP templates; `partials/icons.php` is the SVG icon sprite |
 | `assets/css/app.css` | All public styles; the "Visual & motion layer" section holds the animations |
 | `assets/js/app.js` | Progressive enhancement: reveals, ticker, create form, photo resizing, arena |
+| `media/brand/`, `media/uploads/` | Brand images (originals in `media/brand/originals/`); database-mode uploads (git-ignored, never served) |
 | `database/schema.sql` | Idempotent schema (`CREATE TABLE IF NOT EXISTS`) |
 | `docs/` | `DEPLOYMENT.md`, `VERCEL.md`, `SECURITY.md`, `ADMIN.md`, `VOTING.md`; original logo files in `docs/brand/` |
 | `router.php` | Router for PHP's built-in server (`php -S localhost:8000 router.php`) |
@@ -47,7 +48,7 @@ php -S localhost:8090 api/index.php     # Vercel-style local run (see docs/VERCE
 
 ## Vercel deployment
 
-- `vercel.json` uses the community runtime `vercel-php@0.8.0` (PHP 8.4). Routes send `/assets/*` and `robots.txt` to static files and everything else to `api/index.php`, so source files are never served.
+- `vercel.json` uses the community runtime `vercel-php@0.8.0` (PHP 8.4). Routes send `/assets/*`, `/media/brand/*` and `robots.txt` to static files and everything else to `api/index.php`, so source files are never served.
 - All configuration, including the database, comes only from `config/config.php` (owner's decision, Oct 28). It is git-ignored; to deploy on Vercel the owner either makes the repo private and commits it, or deploys with the Vercel CLI (`.vercelignore` deliberately does not exclude it). The only environment variables read are Vercel's own `VERCEL` and `VERCEL_PROJECT_PRODUCTION_URL`, for platform defaults (`platform_defaults()` in `app/bootstrap.php`), plus `CRON_SECRET`, which Vercel Cron sends and must equal `cron_secret`.
 - First request runs `auto_setup_boot()`: applies the schema, stores a generated app secret in `app_meta` when `app_secret` is empty, and creates the super admin from `admin_email`/`admin_password`. Bump `SCHEMA_VERSION` in `app/auto_setup.php` whenever `database/schema.sql` changes.
 - Sessions always live in the `sessions` table on every host. On Vercel, photos go to `media_files` and logs to stderr automatically.
@@ -93,6 +94,8 @@ Headless Chrome will not lay out narrower than 512px with `--window-size`. For r
 13. **Oct 28: preview mode without a database.** The owner wanted the site to work on Vercel with no database. `config/config.php` is now optional; `db_enabled()` (helpers.php) is false without `db.host`/`db.name`. Then: no auto-setup, PHP's default sessions, empty listings, no ads or housekeeping, and `page_unavailable()` ("… is coming soon", HTTP 503) for create, report, contact, voting APIs and the admin. Match, media and cron routes return 404. With a database everything works as before. An upload-ready InfinityFree package with that host's database was also left on the owner's Desktop (`xevion-infinityfree`), since the InfinityFree database is unreachable from Vercel.
 
 14. **Oct 28: device mode instead of preview mode.** The owner wants the site fully usable on Vercel with no database. Without `db_enabled()`: `/create` renders the normal form with `data-local`, and `app.js` saves the match (photos as JPEG data URLs) in IndexedDB (`xevion-facematch`/`matches`). `/play#id=…` is a client-side arena with pairwise rounds, standings and "Next voter". `/play#s=…` is a share link: deflate-raw + base64url JSON with 240×300 photos in the URL fragment, imported once per link (id = SHA-256 of the payload). Explore and categories list device matches (`local_list.php`). Admin, report, contact and the server vote APIs answer `page_unavailable()`. Votes are per device and are never aggregated. With a database, `/play` is 404 and everything is server-side as before. Also fixed: `.arena-wrap` no longer removes the container's side padding on phones.
+
+15. **Oct 28: master-prompt pass (no database, Vercel).** Brand images moved to `media/brand/` (`brand_img()` helper; originals in `media/brand/originals/`); database-mode uploads moved from `storage/media/` to `media/uploads/` (`uploads_path()`, git-ignored, blocked in `.htaccess`/`router.php`, existing local photos moved). Browser mode gained private matches (AES-GCM link encrypted with a random access code via PBKDF2 210k; lock screen on `/play`), file-signature checks on chosen photos, dimension limits on create, and full validation of shared payloads (size cap, decoded image check). README rewritten around the two modes and limits; SECURITY.md has a browser-mode section. Verified: PHP lint of all 59 files, secret scan of tracked files, Chrome tests of fake-image/SVG rejection, private link with wrong and right codes, brand images, and XAMPP regression (moved photos still served). No package manager exists, so there is nothing to install, build or audit.
 
 ## Known limits and open items
 

@@ -14,6 +14,17 @@ foreach ($categoryLabels as $k => $label) {
     <div class="btn-row" style="justify-content:center"><a class="btn btn-primary" href="<?= e(url('/create')) ?>"><?= icon('plus') ?> Start a match</a></div>
   </div>
 
+  <form data-lp-locked class="arena-state card" hidden>
+    <span class="unavailable-icon"><?= icon('lock') ?></span>
+    <h2 style="margin-top:14px">This match is private</h2>
+    <p class="muted">Enter the access code the organiser sent you.</p>
+    <div class="share" style="max-width:360px;margin:0 auto">
+      <input type="text" name="code" autocomplete="off" autocapitalize="characters" spellcheck="false" maxlength="24" aria-label="Access code" required>
+      <button class="btn btn-primary btn-sm" type="submit">Open</button>
+    </div>
+    <p class="field-error" data-lp-locked-error role="alert"></p>
+  </form>
+
   <div data-lp-main hidden>
     <div class="arena-top">
       <div>
@@ -28,7 +39,8 @@ foreach ($categoryLabels as $k => $label) {
     </div>
 
     <div class="share-panel card pad" data-lp-share-panel hidden>
-      <p class="muted small" style="margin-top:0">Anyone who opens this link can vote on their own device. Photos travel inside the link in a smaller size.</p>
+      <p class="muted small" style="margin-top:0" data-lp-share-intro>Anyone who opens this link can vote on their own device. Photos travel inside the link in a smaller size.</p>
+      <p class="small" data-lp-code-row hidden>Access code: <strong class="code-big" style="font-size:1.1rem" data-lp-code></strong> — send it separately from the link.</p>
       <div class="share"><input type="text" readonly data-lp-share-url aria-label="Share link"><button class="btn btn-ghost btn-sm" type="button" data-lp-copy>Copy</button></div>
       <p class="small" data-lp-share-note aria-live="polite"></p>
     </div>

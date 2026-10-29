@@ -35,14 +35,14 @@ $cur = ['competition' => 'competitions', 'ad' => 'ads'][$route] ?? $route;
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <meta name="robots" content="noindex, nofollow">
 <title><?= e($title ?? 'Admin') ?> | FaceMatch admin</title>
-<link rel="icon" href="<?= e(asset('img/brand/favicon-32.png')) ?>">
+<link rel="icon" href="<?= e(brand_img('favicon-32.png')) ?>">
 <link rel="stylesheet" href="<?= e(asset('css/app.css')) ?>">
 <link rel="stylesheet" href="<?= e(asset('css/admin.css')) ?>">
 <script src="<?= e(asset('js/app.js')) ?>" defer></script>
 </head>
 <body class="admin">
 <aside class="admin-side">
-  <a class="brand" href="<?= e(admin_url()) ?>"><img src="<?= e(asset('img/brand/mark-dark-sm.png')) ?>" alt="" width="28" height="34"><span class="brand-product">FaceMatch<small>Admin</small></span></a>
+  <a class="brand" href="<?= e(admin_url()) ?>"><img src="<?= e(brand_img('mark-dark-sm.png')) ?>" alt="" width="28" height="34"><span class="brand-product">FaceMatch<small>Admin</small></span></a>
   <nav aria-label="Admin">
     <?php foreach ($nav as [$r, $label, $perm]): if ($perm && !admin_can($perm)) { continue; } ?>
       <a href="<?= e(admin_url($r)) ?>"<?= $cur === $r ? ' aria-current="page"' : '' ?>><?= e($label) ?><?php if (!empty($counts[$r])): ?><span class="count<?= $r === 'reports' ? ' warn' : '' ?>"><?= $counts[$r] ?></span><?php endif; ?></a>

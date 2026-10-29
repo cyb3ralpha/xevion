@@ -14,7 +14,7 @@ AddDefaultCharset UTF-8
   # RewriteRule ^ https://%{HTTP_HOST}%{REQUEST_URI} [L,R=301]
 
   # Private folders and dotfiles are never web-accessible.
-  RewriteRule ^(app|config|storage|database|templates|tests|docs)(/|$) - [F,L]
+  RewriteRule ^(app|config|storage|database|templates|tests|docs|media/uploads)(/|$) - [F,L]
   RewriteRule (^|/)\.(?!well-known/) - [F,L]
   RewriteRule \.(sql|md|log|lock|ini|sh|dist)$ - [F,L,NC]
 

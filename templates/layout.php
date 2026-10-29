@@ -14,9 +14,9 @@ $navCurrent = static fn(string $p) => ($path === $p || ($p !== '/' && str_starts
 <meta name="theme-color" content="#0C0727">
 <meta property="og:title" content="<?= e($title) ?>">
 <meta property="og:site_name" content="XEVION FaceMatch">
-<meta property="og:image" content="<?= e(abs_url('/assets/img/brand/og-mark-512.png')) ?>">
-<link rel="icon" type="image/png" sizes="32x32" href="<?= e(asset('img/brand/favicon-32.png')) ?>">
-<link rel="apple-touch-icon" href="<?= e(asset('img/brand/favicon-180.png')) ?>">
+<meta property="og:image" content="<?= e(abs_url('/media/brand/og-mark-512.png')) ?>">
+<link rel="icon" type="image/png" sizes="32x32" href="<?= e(brand_img('favicon-32.png')) ?>">
+<link rel="apple-touch-icon" href="<?= e(brand_img('favicon-180.png')) ?>">
 <link rel="preload" href="<?= e(url('/assets/fonts/outfit.woff2')) ?>" as="font" type="font/woff2" crossorigin>
 <link rel="stylesheet" href="<?= e(asset('css/app.css')) ?>">
 <script src="<?= e(asset('js/app.js')) ?>" defer></script>
@@ -28,7 +28,7 @@ $navCurrent = static fn(string $p) => ($path === $p || ($p !== '/' && str_starts
 <header class="site-header">
   <nav class="container nav" aria-label="Main">
     <a class="brand" href="<?= e(url('/')) ?>" aria-label="XEVION FaceMatch home">
-      <img src="<?= e(asset('img/brand/mark-dark-sm.png')) ?>" alt="" width="28" height="34">
+      <img src="<?= e(brand_img('mark-dark-sm.png')) ?>" alt="" width="28" height="34">
       <span class="brand-product">FaceMatch<small>by XEVION</small></span>
     </a>
     <button class="nav-toggle" type="button" aria-expanded="false" aria-controls="nav-links" data-nav-toggle>Menu</button>
@@ -54,7 +54,7 @@ $navCurrent = static fn(string $p) => ($path === $p || ($p !== '/' && str_starts
   <div class="container">
     <div class="footer-grid">
       <div>
-        <img src="<?= e(asset('img/brand/wordmark-dark-md.png')) ?>" alt="XEVION — Your vision, our technology" width="220" height="77" loading="lazy">
+        <img src="<?= e(brand_img('wordmark-dark-md.png')) ?>" alt="XEVION — Your vision, our technology" width="220" height="77" loading="lazy">
         <p class="muted small" style="margin-top:12px">FaceMatch is a XEVION product for friendly photo face-offs.</p>
       </div>
       <div>

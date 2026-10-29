@@ -219,8 +219,11 @@
         if (!f) { label.textContent = '+ Add photo'; return; }
         var problem = checkFile(f);
         if (problem) { file.value = ''; label.textContent = '+ Add photo'; rowError(r, problem); return; }
-        var img = document.createElement('img'); img.alt = ''; img.src = URL.createObjectURL(f);
-        drop.insertBefore(img, file); label.textContent = 'Change photo';
+        sniffImage(f).then(function (ok) {
+          if (!ok) { file.value = ''; label.textContent = '+ Add photo'; rowError(r, 'This file is not a real JPG, PNG or WebP image.'); return; }
+          var img = document.createElement('img'); img.alt = ''; img.src = URL.createObjectURL(f);
+          drop.insertBefore(img, file); label.textContent = 'Change photo';
+        });
       });
       $('[data-remove]', r).addEventListener('click', function () {
         if (rows().length <= min) return;
@@ -486,8 +489,30 @@
     if (src.close) src.close();
     return c.toDataURL('image/jpeg', quality);
   }
+  /** Check the file's first bytes: JPEG, PNG or WebP only, whatever its name or reported type says. */
+  function sniffImage(file) {
+    return file.slice(0, 12).arrayBuffer().then(function (buf) {
+      var b = new Uint8Array(buf), at = function (i, str) { for (var k = 0; k < str.length; k++) if (b[i + k] !== str.charCodeAt(k)) return false; return true; };
+      return (b[0] === 0xFF && b[1] === 0xD8 && b[2] === 0xFF) || at(0, '\x89PNG') || (at(0, 'RIFF') && at(8, 'WEBP'));
+    }).catch(function () { return false; });
+  }
   function fileToJpeg(file, maxW, maxH, quality) {
-    return decodeImage(file).then(function (src) { return drawJpeg(src, maxW, maxH, quality); });
+    return sniffImage(file).then(function (ok) {
+      if (!ok) throw new Error('one of the files is not a real JPG, PNG or WebP image');
+      return decodeImage(file);
+    }).then(function (src) {
+      var w = src.naturalWidth || src.width, h = src.naturalHeight || src.height;
+      if (w < 160 || h < 160) throw new Error('a photo is too small (minimum 160 × 160 pixels)');
+      if (w > 12000 || h > 12000 || w * h > 60000000) throw new Error('a photo has dimensions that are too large');
+      return drawJpeg(src, maxW, maxH, quality);
+    });
+  }
+  /** Random access code from an unambiguous alphabet: 10 characters, about 50 bits. */
+  function newCode() {
+    var abc = 'ABCDEFGHJKMNPQRSTUVWXYZ23456789', b = new Uint8Array(10), out = '';
+    crypto.getRandomValues(b);
+    for (var i = 0; i < b.length; i++) out += abc[b[i] % abc.length];
+    return out.slice(0, 5) + '-' + out.slice(5);
   }
   function dataUrlToJpeg(dataUrl, maxW, maxH, quality) {
     return new Promise(function (resolve, reject) {
@@ -512,6 +537,7 @@
         people: people.map(function (p, i) { return { id: 'p' + i, name: p.name, img: imgs[i] }; }),
         wins: {}, losses: {}, pairs: {}, round: 1, seen: {}, mine: true
       };
+      if (form.local_visibility && form.local_visibility.value === 'code') { m.private = true; m.code = newCode(); }
       return lput(m).then(function () { return m.id; });
     });
   }
@@ -540,11 +566,37 @@
     if (s.charAt(0) !== 'z' || !window.DecompressionStream) return Promise.reject(new Error('unsupported link'));
     return new Response(new Blob([bytes]).stream().pipeThrough(new DecompressionStream('deflate-raw'))).text();
   }
+  function codeKey(code, salt) {
+    var norm = String(code).toUpperCase().replace(/[^A-Z0-9]/g, '');
+    return crypto.subtle.importKey('raw', new TextEncoder().encode(norm), 'PBKDF2', false, ['deriveKey']).then(function (base) {
+      return crypto.subtle.deriveKey({ name: 'PBKDF2', salt: salt, iterations: 210000, hash: 'SHA-256' }, base,
+        { name: 'AES-GCM', length: 256 }, false, ['encrypt', 'decrypt']);
+    });
+  }
+  function encryptText(text, code) {
+    var salt = crypto.getRandomValues(new Uint8Array(16)), iv = crypto.getRandomValues(new Uint8Array(12));
+    return codeKey(code, salt).then(function (key) {
+      return crypto.subtle.encrypt({ name: 'AES-GCM', iv: iv }, key, new TextEncoder().encode(text));
+    }).then(function (ct) {
+      var out = new Uint8Array(28 + ct.byteLength);
+      out.set(salt, 0); out.set(iv, 16); out.set(new Uint8Array(ct), 28);
+      return 'e' + b64urlFromBytes(out);
+    });
+  }
+  function decryptText(packed, code) {
+    var all = bytesFromB64url(packed.slice(1));
+    if (all.length < 29) return Promise.reject(new Error('invalid'));
+    return codeKey(code, all.slice(0, 16)).then(function (key) {
+      return crypto.subtle.decrypt({ name: 'AES-GCM', iv: all.slice(16, 28) }, key, all.slice(28));
+    }).then(function (pt) { return new TextDecoder().decode(pt); });
+  }
   function shareUrlFor(m) {
     return Promise.all(m.people.map(function (p) { return dataUrlToJpeg(p.img, 240, 300, 0.6); })).then(function (imgs) {
       var payload = { v: 1, t: m.title, c: m.category, cc: m.custom || '', d: m.description || '', i: m.instructions || '',
         p: m.people.map(function (p, i) { return { n: p.name, g: imgs[i] }; }) };
       return packText(JSON.stringify(payload));
+    }).then(function (packed) {
+      return m.private ? encryptText(packed, m.code) : packed;
     }).then(function (packed) { return location.origin + siteUrl('/play') + '#s=' + packed; });
   }
   function digestId(text) {
@@ -554,20 +606,33 @@
     });
   }
   /** Validate a shared match and keep it in this browser (once per link). */
-  function importShared(packed) {
-    var text;
-    return unpackText(packed).then(function (t) {
+  function checkImage(src) {
+    return new Promise(function (resolve, reject) {
+      var img = new Image();
+      img.onload = function () { (img.naturalWidth > 0 && img.naturalWidth <= 2000 && img.naturalHeight <= 2000) ? resolve() : reject(new Error('invalid')); };
+      img.onerror = function () { reject(new Error('invalid')); };
+      img.src = src;
+    });
+  }
+  function importShared(packed, code) {
+    var text, isPrivate = packed.charAt(0) === 'e';
+    if (packed.length > 6000000) return Promise.reject(new Error('invalid'));
+    return (isPrivate ? decryptText(packed, code || '') : Promise.resolve(packed)).then(unpackText).then(function (t) {
       text = t;
       var d = JSON.parse(t);
       if (!d || d.v !== 1 || !Array.isArray(d.p) || d.p.length < 2 || d.p.length > 20) throw new Error('invalid');
       var people = d.p.map(function (p, i) { return { id: 'p' + i, name: clip(p && p.n, 40) || 'Contender ' + (i + 1), img: safeImg(p && p.g) }; });
       if (people.some(function (p) { return !p.img; })) throw new Error('invalid');
+      return Promise.all(people.map(function (p) { return checkImage(p.img); })).then(function () { return d; });
+    }).then(function (d) {
+      var people = d.p.map(function (p, i) { return { id: 'p' + i, name: clip(p.n, 40) || 'Contender ' + (i + 1), img: safeImg(p.g) }; });
       return digestId(text).then(function (id) {
         return lget(id).then(function (existing) {
           if (existing) return id;
           return lput({ id: id, v: 1, created: Date.now(), title: clip(d.t, 120) || 'Shared match', category: clip(d.c, 32),
             custom: clip(d.cc, 40), description: clip(d.d, 600), instructions: clip(d.i, 300), people: people,
-            wins: {}, losses: {}, pairs: {}, round: 1, seen: {}, mine: false }).then(function () { return id; });
+            wins: {}, losses: {}, pairs: {}, round: 1, seen: {}, mine: false,
+            private: isPrivate, code: isPrivate ? String(code) : undefined }).then(function () { return id; });
         });
       });
     });
@@ -582,10 +647,29 @@
     var q = function (s) { return $(s, root); }, m = null, current = null, busy = false, last = '';
     var hash = new URLSearchParams(location.hash.slice(1));
 
-    var load = hash.get('s') ? importShared(hash.get('s')).then(function (id) {
-      history.replaceState(null, '', location.pathname + '#id=' + encodeURIComponent(id));
-      return lget(id);
-    }) : (hash.get('id') ? lget(hash.get('id')) : Promise.resolve(null));
+    var shared = hash.get('s') || '';
+    var openShared = function (code) {
+      return importShared(shared, code).then(function (id) {
+        history.replaceState(null, '', location.pathname + '#id=' + encodeURIComponent(id));
+        return lget(id);
+      });
+    };
+    if (shared.charAt(0) === 'e') {
+      // Private link: nothing can be read until the right access code is entered.
+      q('[data-lp-loading]').hidden = true;
+      var lock = q('[data-lp-locked]'), lockErr = q('[data-lp-locked-error]');
+      lock.hidden = false;
+      lock.addEventListener('submit', function (e) {
+        e.preventDefault();
+        lockErr.textContent = 'Checking…';
+        openShared(lock.code.value).then(function (match) {
+          lock.hidden = true; m = match; q('[data-lp-main]').hidden = false; renderHeader(); showArena();
+        }).catch(function () { lockErr.textContent = 'That code doesn’t open this match. Check it and try again.'; });
+      });
+      lock.code.focus();
+      return wireControls();
+    }
+    var load = shared ? openShared('') : (hash.get('id') ? lget(hash.get('id')) : Promise.resolve(null));
 
     load.then(function (match) {
       q('[data-lp-loading]').hidden = true;
@@ -697,6 +781,9 @@
       q('[data-lp-results]').scrollIntoView({ behavior: reduceMotion ? 'auto' : 'smooth', block: 'start' });
     }
 
+    wireControls();
+
+    function wireControls() {
     $$('.contender', root).forEach(function (btn) {
       btn.addEventListener('click', function () { vote(+btn.dataset.side); });
     });
@@ -722,6 +809,11 @@
     q('[data-lp-share]').addEventListener('click', function () {
       var panel = q('[data-lp-share-panel]'), input = q('[data-lp-share-url]'), note = q('[data-lp-share-note]');
       panel.hidden = false; note.textContent = 'Preparing the link…'; input.value = '';
+      q('[data-lp-code-row]').hidden = !m.private;
+      if (m.private) {
+        q('[data-lp-code]').textContent = m.code || '';
+        q('[data-lp-share-intro]').textContent = 'This link is encrypted. It only opens with the access code, so send the code separately (for example by text message).';
+      }
       shareUrlFor(m).then(function (url) {
         input.value = url;
         note.textContent = url.length > 60000 ? 'This link is long because it carries the photos. If an app cuts it off, send it by email or copy it into a note.' : '';
@@ -735,6 +827,7 @@
         note.textContent = 'Link copied.';
       }).catch(function () { input.select(); note.textContent = 'Press Ctrl+C (or long-press) to copy.'; });
     });
+    }
   }
 
   /* ---------- "Your matches" list ---------- */

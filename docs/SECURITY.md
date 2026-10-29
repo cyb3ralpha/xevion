@@ -16,7 +16,7 @@ Grants in a session remember which token hash produced them, so revoking or rege
 - **SQL:** every query uses PDO prepared statements with native (non-emulated) prepares.
 - **XSS:** all output passes through `e()`; strict Content-Security-Policy (`script-src 'self'`, no inline script, `object-src 'none'`, `frame-ancestors 'none'`).
 - **CSRF:** per-session token on every form and on the JSON vote API (`X-CSRF-Token`).
-- **Uploads:** size, MIME (by content, not extension), dimensions and pixel-count limits; decoded with GD and written as new WebP/JPEG files, which strips EXIF/GPS and any embedded payload. Files live in `storage/` (not web-accessible), have random names, and are served through PHP after an authorisation check with `nosniff` and a sandboxing CSP. Ad creatives follow the same path; SVG/GIF are not accepted.
+- **Uploads:** size, MIME (by content, not extension), dimensions and pixel-count limits; decoded with GD and written as new WebP/JPEG files, which strips EXIF/GPS and any embedded payload. Files live in `media/uploads/` (not web-accessible), have random names, and are served through PHP after an authorisation check with `nosniff` and a sandboxing CSP. Ad creatives follow the same path; SVG/GIF are not accepted.
 - **Removal:** deleting a photo deletes the file. Public images use a 5-minute cache; private images are `no-store`.
 - **Enumeration:** public IDs are random (12 or 16 characters); database IDs never appear in public URLs. A private match that exists but isn't unlocked returns the same 404 as one that doesn't exist.
 - **Rate limits** (MySQL-backed, per keyed IP hash): creating matches (5/hour, 15/day by default), upload volume (300 MB/day), votes (40/min), reports (10/hour), contact (5/hour), access-code attempts (5 per 15 min per match), admin login (10 per 15 min per network and 6 per account).
@@ -25,6 +25,15 @@ Grants in a session remember which token hash produced them, so revoking or rege
 - **Errors:** production shows generic error pages; details go to `storage/logs/` (never web-accessible). Database connection errors don't reveal host or user.
 - **Setup:** there is no installer page. The first administrator comes only from server-side configuration (`config/config.php`) and is created only while no super administrator exists.
 - **Audit log:** every admin action, creator management action and automatic moderation action is recorded with actor, target and details. There is no way to edit or delete entries from the application.
+
+## Browser mode (no database)
+
+When the site runs without a database, matches never reach the server:
+
+- **Uploads** are checked in the browser by file signature (JPEG, PNG or WebP only; SVG, HTML and anything else is refused), size and dimensions, then redrawn onto a canvas as a new JPEG. That removes metadata such as GPS. Nothing is uploaded, so there is no server file to attack.
+- **Share links** keep the match after `#`, which browsers never send to servers or put in `Referer` headers. On opening, the data is size-capped, parsed as JSON, every name is inserted as plain text, every photo must be a `data:image` URL that decodes to an image no larger than 2000 pixels, and the CSP blocks scripts from any other source.
+- **Private matches** encrypt the link with AES-256-GCM; the key comes from a random 10-character access code (about 50 bits) through PBKDF2-SHA256 with 210,000 iterations and a random salt. Wrong codes fail the authentication check and reveal nothing. There is no server to rate-limit guesses, so the strength rests on the code length and the slow key derivation.
+- **Limits that cannot be fixed without shared storage:** votes are counted per device and can be edited by whoever controls that browser; nothing stops someone forwarding a link and its code; shared copies cannot be revoked; there is no moderation or reporting. The interface says results are "on this device" and never presents them as official.
 
 ## Personal data and retention
 

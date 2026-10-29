@@ -87,10 +87,13 @@ $local = !empty($local); // no database: the match is saved in this browser
 
     <?php if ($local): ?>
     <section class="card pad">
-      <div class="step-title"><span class="n">3</span><h2>Sharing</h2></div>
-      <ul class="trust trust-stack">
-        <li><?= icon('lock') ?> The match and its photos are saved only in this browser.</li>
-        <li><?= icon('link') ?> After creating it you get a share link. Anyone who opens it can vote on their own phone or computer.</li>
+      <div class="step-title"><span class="n">3</span><h2>Who can open it</h2></div>
+      <div class="choice-row" role="radiogroup" aria-label="Who can open the match">
+        <div class="choice"><input type="radio" id="lv-link" name="local_visibility" value="link" checked><label for="lv-link"><strong>Anyone with the link</strong><span>Share the link and friends can vote straight away.</span></label></div>
+        <div class="choice"><input type="radio" id="lv-code" name="local_visibility" value="code"><label for="lv-code"><strong>Private, with an access code</strong><span>The link is encrypted. People also need the code you send them separately.</span></label></div>
+      </div>
+      <ul class="trust trust-stack" style="margin-top:16px">
+        <li><?= icon('lock') ?> The match and its photos are saved only in this browser, never on our servers.</li>
         <li><?= icon('chart') ?> Each device keeps its own results. Pass one phone around to vote together.</li>
       </ul>
     </section>

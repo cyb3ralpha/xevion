@@ -9,7 +9,7 @@
  * re-encodes photos to JPEG before upload (assets/js/app.js). The server then
  * validates the file and removes every metadata segment in plain PHP before storing it.
  *
- * Files are stored outside the web root (storage/media) or, on serverless hosts, in
+ * Files are stored in media/uploads (never web-accessible) or, on serverless hosts, in
  * the media_files table. They are only ever served through media handlers that check
  * authorisation first.
  */
@@ -261,14 +261,14 @@ function media_put(string $prefix, string $ext, string $bytes): string
         q('INSERT INTO media_files (mkey, data) VALUES (?, ?)', [$key, $bytes]);
         return $key;
     }
-    $dir = storage_path('media/' . $sub);
+    $dir = uploads_path($sub);
     if (!is_dir($dir) && !mkdir($dir, 0750, true) && !is_dir($dir)) {
         throw new RuntimeException('Cannot create media directory');
     }
-    if (file_put_contents(storage_path('media/' . $key), $bytes, LOCK_EX) === false) {
+    if (file_put_contents(uploads_path($key), $bytes, LOCK_EX) === false) {
         throw new RuntimeException('Cannot write media file');
     }
-    @chmod(storage_path('media/' . $key), 0640);
+    @chmod(uploads_path($key), 0640);
     return $key;
 }
 
@@ -388,7 +388,7 @@ function media_locate(?string $rel): ?string
     if (media_driver() === 'db') {
         return q_val('SELECT 1 FROM media_files WHERE mkey = ?', [$rel]) ? 'db:' . $rel : null;
     }
-    $p = storage_path('media/' . $rel);
+    $p = uploads_path($rel);
     return is_file($p) ? $p : null;
 }
 
@@ -401,7 +401,7 @@ function delete_media(?string $rel): void
         q('DELETE FROM media_files WHERE mkey = ?', [$rel]);
         return;
     }
-    $p = storage_path('media/' . $rel);
+    $p = uploads_path($rel);
     if (is_file($p)) {
         @unlink($p);
     }
